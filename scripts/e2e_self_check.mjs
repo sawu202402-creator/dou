@@ -68,9 +68,11 @@ function startLocalServer() {
         updatedAt: 0,
         updatedBy: '',
         watcherLastSeenAt: Date.now(),
-        watcherOnline: true
+        watcherOnline: true,
+        expiresAt: 0,
+        remainingMinutes: 0
     };
-    const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0, patrolPostCalls: 0 };
+    const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0, patrolPostCalls: 0, lastWhisperHints: '' };
     let liveVersionObj = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
 
     const srv = http.createServer((req, res) => {
@@ -107,6 +109,10 @@ function startLocalServer() {
             req.on('data', (c) => chunks.push(c));
             req.on('end', () => {
                 mailboxLog.transcribeCalls += 1;
+                const rawH = req.headers['x-story-hints'];
+                if (rawH) {
+                    try { mailboxLog.lastWhisperHints = decodeURIComponent(String(rawH)); } catch (_) {}
+                }
                 const buf = Buffer.concat(chunks);
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({
@@ -143,7 +149,8 @@ function startLocalServer() {
                         replyText,
                         audioBase64: sampleWavBase64,
                         wishes: memWishes,
-                        replies: memReplies
+                        replies: memReplies,
+                        patrol: patrolState
                     }));
                     return;
                 }
@@ -184,6 +191,8 @@ function startLocalServer() {
                         patrolState.enabled = Boolean(body.enabled);
                         patrolState.updatedAt = Date.now();
                         patrolState.updatedBy = String(body.source || 'web');
+                        patrolState.expiresAt = patrolState.enabled ? (Date.now() + 60 * 60 * 1000) : 0;
+                        patrolState.remainingMinutes = patrolState.enabled ? 60 : 0;
                         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                         res.end(JSON.stringify({ ok: true, patrol: patrolState, serverTime: Date.now() }));
                         return;
@@ -421,7 +430,7 @@ async function main() {
 
         await cdp.send('Page.navigate', { url: origin }, sessionId);
         await waitFor(`Boolean(document.querySelector('.book-card[data-book-id="moon-dessert-shop"]'))`, 6000, 'bookshelf');
-        await waitFor(`Array.from(document.querySelectorAll('img')).every(i => i.complete && i.naturalWidth > 0)`, 6000, 'cover image load');
+        await waitFor(`Array.from(document.querySelectorAll('.book-cover-img')).every(i => i.complete && i.naturalWidth > 0)`, 6000, 'cover image load');
 
         // 标记当前页面实例，后续断言热刷新未重刷整页
         await evalJs(`window.__E2E_PAGE_TOKEN__ = "alive_" + Math.random();`);
@@ -463,13 +472,22 @@ async function main() {
         await waitFor(`document.getElementById('smTextInput').value.includes('草莓飞机')`, 4000, 'whisper transcript');
         assert.ok(mailboxLog.transcribeCalls >= 1, '应当调用 /api/mailbox/transcribe 转写录音');
 
-        // 发送留言 -> /api/mailbox/wish AI 实时回复 + 语音播报
+        // 发送留言 -> /api/mailbox/wish AI 实时回复 + 关巡检时出现一键唤醒提示
         await evalJs(`document.getElementById('smSendBtn').click()`);
-        await waitFor(`document.querySelectorAll('.sm-from-kid').length >= 1 && document.querySelectorAll('.sm-badge-live').length >= 1`, 4000, 'wish & ai reply bubble');
+        await waitFor(
+            `window.__PEA_STORY_HOUSE__.mailbox.isSending === false && !document.getElementById('smThinkingRow') && document.querySelectorAll('.sm-from-kid').length >= 1 && document.querySelectorAll('.sm-badge-live').length >= 1`,
+            4000,
+            'wish & ai reply bubble'
+        );
         assert.ok(mailboxLog.wishCalls >= 1, '应当调用 /api/mailbox/wish 发送留言');
+        assert.equal(await evalJs(`document.getElementById('smWakePrompt').hidden`), false, '巡检关闭时发送点子应显示一键召唤画师提示');
+        await evalJs(`document.getElementById('smWakeNowBtn').click()`);
+        await waitFor(`document.getElementById('live-status').getAttribute('aria-pressed') === 'true' && document.getElementById('smWakePrompt').hidden === true`, 3000, 'wake now button turns patrol ON');
+        await evalJs(`document.getElementById('smPatrolSwitch').click()`);
+        await waitFor(`document.getElementById('live-status').getAttribute('aria-pressed') === 'false'`, 3000, 'restore patrol OFF');
         await saveScreenshot(cdp, sessionId, '07-split-mailbox.png');
 
-        // 注入正式画师回信并验证一键跳书页
+        // 注入正式画师回信并验证不打断向上翻看、随后一键跳书页
         const firstWishId = memWishes[0]?.id || '';
         await fetch(`${origin}/api/mailbox/reply`, {
             method: 'POST',
@@ -482,18 +500,28 @@ async function main() {
                 text: '小豌豆，你的草莓飞机点子超棒！快看看第 3 页吧！'
             })
         });
+        await evalJs(`(() => { const s = document.getElementById('smStream'); s.scrollTop = 0; })()`);
         await evalJs(`window.__PEA_STORY_HOUSE__.mailbox.syncFromCloud()`);
         await waitFor(`Boolean(document.querySelector('.sm-jump-btn'))`, 4000, 'formal reply jump button');
+        await evalJs(`(() => { const s = document.getElementById('smStream'); s.scrollTop = 0; })()`);
+        await evalJs(`window.__PEA_STORY_HOUSE__.mailbox.syncFromCloud()`);
+        const preservedScrollTop = await evalJs(`document.getElementById('smStream').scrollTop`);
+        assert.equal(preservedScrollTop, 0, '无新消息时同步云端不应强制拉回对话流底部');
+
         await evalJs(`document.querySelector('.sm-jump-btn').click()`);
         await waitFor(`document.getElementById('storyMailboxOverlay').hidden === true && window.__PEA_STORY_HOUSE__.getState().view === 'reader' && window.__PEA_STORY_HOUSE__.getState().pageIndex === 2`, 4000, 'jump to book page 3');
         await evalJs(`document.getElementById('btn-back-shelf').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'return to shelf');
-        console.log('✓ [590x820] 站内语音识别、AI实时陪聊与云端回信直达书页通过');
+        console.log('✓ [590x820] 站内语音识别、唤醒提示、防跳底滚动与云端回信直达通过');
 
-        // 点击书卡进入精装有声绘本模式
+        // 验证书架上显示阅读进度，点开续读第 3 页，再切换到第 1 页做全页自检
+        const shelfProgressText = await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"] .progress-pill')?.textContent || ''`);
+        assert.ok(shelfProgressText.includes('第 3 页'), `书架卡片应显示阅读进度，实际: ${shelfProgressText}`);
         await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"]').click()`);
-        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'reader'`, 5000, 'reader view');
-        await waitFor(`Array.from(document.querySelectorAll('img')).every(i => i.complete && i.naturalWidth > 0)`, 5000, 'storybook img p1');
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'reader' && window.__PEA_STORY_HOUSE__.getState().pageIndex === 2`, 5000, 'resume reader at page 3');
+        await evalJs(`document.querySelector('.page-dot[data-page-idx="0"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().pageIndex === 0`, 4000, 'storybook reset to p1');
+        await waitFor(`Array.from(document.querySelectorAll('.storybook-illustration')).every(i => i.complete && i.naturalWidth > 0)`, 5000, 'storybook img p1');
 
         const spreadGeometry = await evalJs(`(() => {
             const left = document.querySelector('.storybook-left-page').getBoundingClientRect();
@@ -513,6 +541,14 @@ async function main() {
         const rtOnAgain = await evalJs(`getComputedStyle(document.querySelector('rt.py-rt')).display`);
         assert.notEqual(rtOnAgain, 'none', '重新打开拼音后 <rt> 应当显示');
 
+        // 语速切换（慢读 0.85 <-> 常速 1.0）
+        assert.equal(await evalJs(`window.__PEA_STORY_HOUSE__.getState().slowMode`), false, '初始应为常速模式');
+        await evalJs(`document.getElementById('btn-speed').click()`);
+        assert.equal(await evalJs(`window.__PEA_STORY_HOUSE__.getState().slowMode`), true, '点击慢读按钮应切换为慢读模式');
+        assert.equal(await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.playbackRate`), 0.85, '慢读语速应为 0.85');
+        await evalJs(`document.getElementById('btn-speed').click()`);
+        assert.equal(await evalJs(`window.__PEA_STORY_HOUSE__.getState().slowMode`), false, '再次点击应恢复常速');
+
         await saveScreenshot(cdp, sessionId, '02-split-storybook.png');
 
         // 绘本 4 页翻页 & 大图全检
@@ -520,11 +556,19 @@ async function main() {
             await waitFor(`window.__PEA_STORY_HOUSE__.getState().pageIndex === ${p}`, 4000, `story page ${p + 1}`);
             await waitFor(`Array.from(document.querySelectorAll('.storybook-illustration')).every(i => i.complete && i.naturalWidth > 0)`, 5000, `story img ${p + 1}`);
             if (p === 0) {
+                await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.clearCache()`);
+                ttsLog.length = 0;
+                await evalJs(`document.querySelector('.story-para-btn').click()`);
+                await waitFor(`window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`, 3000, 'story para audio playback');
+                assert.ok(ttsLog.some((t) => t.role === 'narrator'), '点击绘本段落应请求 narrator 声线');
+
+                // 验证仅清空内存缓存后，同一句再次点击可直接命中浏览器 CacheStorage 持久缓存而不重复请求后端
+                await sleep(120);
                 await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine._ttsMemCache.clear()`);
                 ttsLog.length = 0;
                 await evalJs(`document.querySelector('.story-para-btn').click()`);
-                await waitFor(`window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`, 2000, 'story para audio playback');
-                assert.ok(ttsLog.some((t) => t.role === 'narrator'), '点击绘本段落应请求 narrator 声线');
+                await waitFor(`window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`, 3000, 'story para disk cache playback');
+                assert.equal(ttsLog.length, 0, '命中浏览器 CacheStorage 持久缓存后不应再请求 /api/tts');
             }
             if (p < 3) {
                 await evalJs(`document.getElementById('btn-next-page').click()`);
@@ -554,15 +598,24 @@ async function main() {
 
             if (p === 0) {
                 await saveScreenshot(cdp, sessionId, '03-split-comic-p1.png');
+                // 测试漫画插画点击放大看细节
+                await evalJs(`document.querySelector('.comic-art-zoom-btn').click()`);
+                await waitFor(`document.getElementById('art-lightbox').hidden === false && document.getElementById('art-lightbox-img').complete && document.getElementById('art-lightbox-img').naturalWidth > 0`, 3000, 'open comic lightbox');
+                await evalJs(`document.getElementById('btn-lightbox-close').click()`);
+                await waitFor(`document.getElementById('art-lightbox').hidden === true`, 2000, 'close comic lightbox');
             }
 
             // 逐个点击本页角色气泡并记录角色声线
             const bubbleRoles = await evalJs(`Array.from(document.querySelectorAll('.comic-bubble')).map(b => b.getAttribute('data-role'))`);
             for (let bIdx = 0; bIdx < bubbleRoles.length; bIdx++) {
-                await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine._ttsMemCache.clear()`);
+                await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.clearCache()`);
                 ttsLog.length = 0;
                 await evalJs(`document.querySelectorAll('.comic-bubble')[${bIdx}].click()`);
-                await sleep(220);
+                await waitFor(
+                    `window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`,
+                    3000,
+                    `comic bubble p${p + 1} b${bIdx}`
+                );
                 const expectedRole = bubbleRoles[bIdx];
                 assert.ok(ttsLog.some((t) => t.role === expectedRole), `第 ${p + 1} 页气泡 ${bIdx} 应请求角色声线 ${expectedRole}`);
                 seenComicRoles.add(expectedRole);
@@ -580,7 +633,7 @@ async function main() {
         // 全书连播测试（从第 3 页连播跨到第 4 页并自动收尾）
         await evalJs(`document.querySelector('.page-dot[data-page-idx="2"]').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.getState().pageIndex === 2`, 4000, 'goto page 3 for autoplay');
-        await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine._ttsMemCache.clear()`);
+        await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.clearCache()`);
         ttsLog.length = 0;
         await evalJs(`document.getElementById('btn-autoplay').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.getState().pageIndex === 3`, 8000, 'autoplay advance to page 4');
@@ -633,7 +686,16 @@ async function main() {
         await evalJs(`document.getElementById('btn-back-shelf').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 4000, 'full shelf');
         assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '全屏书架存在横向溢出');
-        console.log('✓ [1180x820] iPad 横屏全屏全视图无溢出通过');
+
+        // 验证书架显示第 2 页进度，且再次点开直接续读第 2 页和偏好的漫画模式
+        const p2Badge = await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"] .progress-pill')?.textContent || ''`);
+        assert.ok(p2Badge.includes('第 2 页'), `返回书架应显示第 2 页阅读进度，实际: ${p2Badge}`);
+        await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'reader' && window.__PEA_STORY_HOUSE__.getState().pageIndex === 1 && window.__PEA_STORY_HOUSE__.getState().mode === 'comic'`, 4000, 'resume page 2 in comic mode');
+        await evalJs(`document.getElementById('btn-back-shelf').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'back to shelf final');
+
+        console.log('✓ [1180x820] iPad 横屏全屏全视图、续读进度与模式偏好通过');
 
         assert.deepEqual(consoleErrors, [], `Console errors detected: ${consoleErrors.join('; ')}`);
         assert.deepEqual(pageExceptions, [], `Page exceptions detected: ${pageExceptions.join('; ')}`);

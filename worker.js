@@ -8,13 +8,15 @@
  * 5. 其余静态资源交由 Cloudflare Assets 分发，并对 /version.json 及 *.json 强制禁用边缘缓存，确保 iPad 3 秒热刷新零延迟。
  */
 import { DurableObject } from "cloudflare:workers";
-import { ROLE_NEURAL_VOICES, synthesizeNeuralMp3Base64 } from "./edgeTtsMod.js";
+import { ROLE_NEURAL_VOICES, getRoleVoiceProfile, stripSpeechTextForTts, synthesizeNeuralMp3Base64 } from "./edgeTtsMod.js";
 
 const CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Token, X-Story-Hints"
 };
+
+const PATROL_AUTO_OFF_MS = 60 * 60 * 1000;
 
 const AI_MODEL_CHAIN = [
     "@cf/qwen/qwen3-30b-a3b-fp8",
@@ -23,13 +25,14 @@ const AI_MODEL_CHAIN = [
     "@cf/meta/llama-3.1-8b-instruct"
 ];
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(data), {
         status,
         headers: {
             "Content-Type": "application/json; charset=utf-8",
             "Cache-Control": "no-store, no-cache, must-revalidate",
-            ...CORS_HEADERS
+            ...CORS_HEADERS,
+            ...extraHeaders
         }
     });
 }
@@ -37,6 +40,30 @@ function jsonResponse(data, status = 200) {
 function cleanStr(val, maxLen = 600) {
     if (val === undefined || val === null) return "";
     return String(val).trim().slice(0, maxLen);
+}
+
+function formatBeijingTimeStr(tsMs = Date.now()) {
+    const d = new Date(Number(tsMs) + 8 * 3600 * 1000);
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    const hh = String(d.getUTCHours()).padStart(2, "0");
+    const mi = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${mm}/${dd} ${hh}:${mi}`;
+}
+
+async function sha256Hex(str) {
+    const bytes = new TextEncoder().encode(String(str || ""));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function isAdminAuthorized(request, env) {
+    const token = cleanStr(env?.MAILBOX_ADMIN_TOKEN, 200);
+    if (!token) return true;
+    const auth = cleanStr(request.headers.get("Authorization"), 240);
+    const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+    const headerToken = cleanStr(request.headers.get("X-Admin-Token"), 200);
+    return bearer === token || headerToken === token;
 }
 
 function sanitizeAiReplyText(raw) {
@@ -100,7 +127,7 @@ function cleanWhisperTranscript(raw) {
     return s.slice(0, 500);
 }
 
-async function transcribeAudioFast(aiBinding, { rawBytes = null, audioBase64 = "", contentType = "audio/webm" } = {}) {
+async function transcribeAudioFast(aiBinding, { rawBytes = null, audioBase64 = "", contentType = "audio/webm", hints = "" } = {}) {
     if (!aiBinding || typeof aiBinding.run !== "function") {
         throw new Error("ai_binding_unavailable");
     }
@@ -120,6 +147,14 @@ async function transcribeAudioFast(aiBinding, { rawBytes = null, audioBase64 = "
         return { text: "", model: "empty" };
     }
 
+    const cleanHints = cleanStr(hints, 140).replace(/[。\n\r]+/g, "，");
+    const initialPrompt = cleanStr(
+        cleanHints
+            ? `简体中文普通话。小豌豆，麻薯兔，云朵熊，糖糖星，彩虹，烟烟，${cleanHints}`
+            : "简体中文普通话。小豌豆，麻薯兔，云朵熊，糖糖星，彩虹，烟烟。",
+        220
+    );
+
     try {
         const res = await aiBinding.run("@cf/openai/whisper-large-v3-turbo", {
             audio: cleanB64,
@@ -128,7 +163,7 @@ async function transcribeAudioFast(aiBinding, { rawBytes = null, audioBase64 = "
             beam_size: 5,
             condition_on_previous_text: false,
             vad_filter: false,
-            initial_prompt: "简体中文普通话。小豌豆，麻薯兔，云朵熊，糖糖星。"
+            initial_prompt: initialPrompt
         });
         const txt = cleanWhisperTranscript(res?.text ?? res?.result?.text ?? "");
         if (txt) {
@@ -298,17 +333,40 @@ export class StoryMailboxDO extends DurableObject {
     }
 
     _getPatrolState() {
+        const now = Date.now();
         const enabledRow = this._getSetting("patrol_enabled", "0");
+        const expiresRow = this._getSetting("patrol_expires_at", "0");
         const hbRow = this._getSetting("watcher_heartbeat_at", "0");
         const byRow = this._getSetting("patrol_updated_by", "");
+
+        let enabled = enabledRow.value === "1" || enabledRow.value === "true";
+        let updatedAt = enabledRow.updatedAt || 0;
+        let updatedBy = byRow.value || "";
+        let expiresAt = Number(expiresRow.value) || 0;
+
+        if (enabled && expiresAt > 0 && now >= expiresAt) {
+            this._setSetting("patrol_enabled", "0", now);
+            this._setSetting("patrol_expires_at", "0", now);
+            this._setSetting("patrol_updated_by", "auto_timeout", now);
+            enabled = false;
+            expiresAt = 0;
+            updatedAt = now;
+            updatedBy = "auto_timeout";
+        }
+
         const watcherLastSeenAt = Number(hbRow.value) || 0;
-        const watcherOnline = watcherLastSeenAt > 0 && (Date.now() - watcherLastSeenAt) < 60_000;
+        const watcherOnline = watcherLastSeenAt > 0 && (now - watcherLastSeenAt) < 60_000;
+        const remainingMs = enabled && expiresAt > 0 ? Math.max(0, expiresAt - now) : 0;
+        const remainingMinutes = remainingMs > 0 ? Math.ceil(remainingMs / 60_000) : 0;
+
         return {
-            enabled: enabledRow.value === "1" || enabledRow.value === "true",
-            updatedAt: enabledRow.updatedAt || 0,
-            updatedBy: byRow.value || "",
+            enabled,
+            updatedAt,
+            updatedBy,
             watcherLastSeenAt,
-            watcherOnline
+            watcherOnline,
+            expiresAt,
+            remainingMinutes
         };
     }
 
@@ -361,7 +419,7 @@ export class StoryMailboxDO extends DurableObject {
         const instantReplyKey = cleanStr(raw.instantReplyKey, 48);
         const instantReplyText = cleanStr(raw.instantReplyText, 600);
         const createdAt = Number(raw.createdAt) > 0 ? Math.floor(Number(raw.createdAt)) : now;
-        const createdStr = cleanStr(raw.createdStr, 32) || new Date(createdAt).toISOString().slice(5, 16).replace("T", " ");
+        const createdStr = cleanStr(raw.createdStr, 32) || formatBeijingTimeStr(createdAt);
 
         this.ctx.storage.sql.exec(
             `INSERT INTO story_wishes
@@ -423,6 +481,12 @@ export class StoryMailboxDO extends DurableObject {
                 const now = Date.now();
                 this._setSetting("patrol_enabled", body.enabled ? "1" : "0", now);
                 this._setSetting("patrol_updated_by", cleanStr(body.source, 24) || "web", now);
+                if (body.enabled) {
+                    const ttlMinutes = Math.max(10, Math.min(240, Number(body.ttlMinutes) || 60));
+                    this._setSetting("patrol_expires_at", String(now + ttlMinutes * 60_000), now);
+                } else {
+                    this._setSetting("patrol_expires_at", "0", now);
+                }
                 return jsonResponse({
                     ok: true,
                     patrol: this._getPatrolState(),
@@ -441,6 +505,18 @@ export class StoryMailboxDO extends DurableObject {
                 const pageNumber = Math.max(1, Number(body.pageNumber) || 1);
                 const mode = cleanStr(body.mode, 24) || "shelf";
                 const prevData = this._readAll();
+
+                // 先立刻把小豌豆的点子落盘写入 SQLite，防止后续 AI 或网络波动丢失留言
+                const savedWish = this._upsertWish({
+                    ...body,
+                    instantReplyKey: "",
+                    instantReplyText: ""
+                });
+
+                if (this._getSetting("patrol_enabled", "0").value === "1") {
+                    const now = Date.now();
+                    this._setSetting("patrol_expires_at", String(now + PATROL_AUTO_OFF_MS), now);
+                }
 
                 let replyKey = "local_fallback";
                 let replyText = cleanStr(body.fallbackReplyText, 600) || buildFallbackArtistReply(text, bookTitle);
@@ -470,7 +546,7 @@ export class StoryMailboxDO extends DurableObject {
                 }
 
                 this._upsertWish({
-                    ...body,
+                    ...savedWish,
                     instantReplyKey: replyKey,
                     instantReplyText: replyText
                 });
@@ -485,6 +561,7 @@ export class StoryMailboxDO extends DurableObject {
                     audioBase64,
                     wishes,
                     replies,
+                    patrol: this._getPatrolState(),
                     serverTime: Date.now()
                 });
             }
@@ -501,6 +578,9 @@ export class StoryMailboxDO extends DurableObject {
             }
 
             if (request.method === "POST" && path === "/api/mailbox/reply") {
+                if (!isAdminAuthorized(request, this.env)) {
+                    return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+                }
                 const body = await request.json().catch(() => ({}));
                 const text = cleanStr(body.text, 1000);
                 if (!text) {
@@ -514,7 +594,7 @@ export class StoryMailboxDO extends DurableObject {
                 const bookId = cleanStr(body.bookId, 80);
                 const pageNumber = Math.max(1, Number(body.pageNumber) || 1);
                 const createdAt = Number(body.createdAt) > 0 ? Math.floor(Number(body.createdAt)) : now;
-                const createdStr = cleanStr(body.createdStr, 32) || new Date(createdAt).toISOString().slice(5, 16).replace("T", " ");
+                const createdStr = cleanStr(body.createdStr, 32) || formatBeijingTimeStr(createdAt);
 
                 this.ctx.storage.sql.exec(
                     `INSERT INTO artist_replies
@@ -547,6 +627,9 @@ export class StoryMailboxDO extends DurableObject {
             }
 
             if (request.method === "POST" && path === "/api/mailbox/status") {
+                if (!isAdminAuthorized(request, this.env)) {
+                    return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+                }
                 const body = await request.json().catch(() => ({}));
                 const status = cleanStr(body.status, 24);
                 if (Array.isArray(body.ids) && ["pending", "read", "fulfilled"].includes(status)) {
@@ -571,7 +654,7 @@ export class StoryMailboxDO extends DurableObject {
 }
 
 export default {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
         if (url.pathname.startsWith("/api/") && request.method === "OPTIONS") {
@@ -594,11 +677,68 @@ export default {
                     const body = await request.json().catch(() => ({}));
                     const text = cleanStr(body.text, 600);
                     const role = cleanStr(body.role, 32) || "narrator";
-                    if (!text) {
+                    const cleanText = stripSpeechTextForTts(text);
+                    if (!cleanText) {
                         return jsonResponse({ ok: false, error: "empty_text" }, 400);
                     }
-                    const audioBase64 = await synthesizeNeuralMp3Base64(text, role);
-                    return jsonResponse({ ok: true, role, audioBase64 });
+
+                    const prof = getRoleVoiceProfile(role);
+                    const cacheHash = await sha256Hex(JSON.stringify({
+                        v: 1,
+                        voice: prof.voice,
+                        rate: prof.rate,
+                        pitch: prof.pitch,
+                        text: cleanText
+                    }));
+                    const cacheReq = new Request(`https://tts-cache.pea-story-house.internal/v1/${cacheHash}`, { method: "GET" });
+                    const edgeCache = typeof caches !== "undefined" ? caches.default : null;
+
+                    if (edgeCache) {
+                        try {
+                            const hit = await edgeCache.match(cacheReq);
+                            if (hit) {
+                                const hitText = await hit.text();
+                                return new Response(hitText, {
+                                    status: 200,
+                                    headers: {
+                                        "Content-Type": "application/json; charset=utf-8",
+                                        "Cache-Control": "no-store, no-cache, must-revalidate",
+                                        "X-TTS-Cache": "HIT",
+                                        ...CORS_HEADERS
+                                    }
+                                });
+                            }
+                        } catch (_) {}
+                    }
+
+                    const audioBase64 = await synthesizeNeuralMp3Base64(cleanText, role);
+                    const payloadStr = JSON.stringify({ ok: true, role, audioBase64 });
+
+                    if (edgeCache && audioBase64) {
+                        try {
+                            const cacheResp = new Response(payloadStr, {
+                                status: 200,
+                                headers: {
+                                    "Content-Type": "application/json; charset=utf-8",
+                                    "Cache-Control": "public, max-age=604800"
+                                }
+                            });
+                            const putPromise = edgeCache.put(cacheReq, cacheResp).catch(() => {});
+                            if (ctx && typeof ctx.waitUntil === "function") {
+                                ctx.waitUntil(putPromise);
+                            }
+                        } catch (_) {}
+                    }
+
+                    return new Response(payloadStr, {
+                        status: 200,
+                        headers: {
+                            "Content-Type": "application/json; charset=utf-8",
+                            "Cache-Control": "no-store, no-cache, must-revalidate",
+                            "X-TTS-Cache": "MISS",
+                            ...CORS_HEADERS
+                        }
+                    });
                 } catch (err) {
                     return jsonResponse({
                         ok: false,
@@ -613,15 +753,27 @@ export default {
             if (request.method === "POST" && url.pathname === "/api/mailbox/transcribe") {
                 try {
                     const ctype = (request.headers.get("content-type") || "").toLowerCase();
+                    let hints = "";
+                    const rawHeaderHints = request.headers.get("x-story-hints") || "";
+                    if (rawHeaderHints) {
+                        try {
+                            hints = decodeURIComponent(rawHeaderHints);
+                        } catch (_) {
+                            hints = rawHeaderHints;
+                        }
+                    }
+
                     let result;
                     if (ctype.includes("application/json")) {
                         const body = await request.json().catch(() => ({}));
-                        result = await transcribeAudioFast(env?.AI, { audioBase64: body.audioBase64 });
+                        if (!hints && body.hints) hints = body.hints;
+                        result = await transcribeAudioFast(env?.AI, { audioBase64: body.audioBase64, hints });
                     } else {
                         const ab = await request.arrayBuffer();
                         result = await transcribeAudioFast(env?.AI, {
                             rawBytes: new Uint8Array(ab),
-                            contentType: ctype || "audio/webm"
+                            contentType: ctype || "audio/webm",
+                            hints
                         });
                     }
                     return jsonResponse({ ok: true, text: result.text, model: result.model });

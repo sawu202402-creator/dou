@@ -11,6 +11,11 @@ import { ROLE_NEURAL_VOICES, generateSecMsGecV2, stripSpeechTextForTts } from '.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+const MAX_BOOK_IMAGE_BYTES = 350 * 1024;
+const PRIMARY_STORY_ROLES = [
+    'narrator', 'system_notice', 'pea', 'bunny', 'bear',
+    'star_boy', 'prince', 'grandpa', 'fairy', 'cat', 'panda', 'succulent'
+];
 
 function readJson(relPath) {
     const abs = path.join(ROOT, relPath);
@@ -18,12 +23,17 @@ function readJson(relPath) {
     return JSON.parse(fs.readFileSync(abs, 'utf8'));
 }
 
-function assertImageFile(relPath, label) {
+function assertImageFile(relPath, label, referencedSet = null) {
     assert.ok(typeof relPath === 'string' && relPath.trim(), `${label} 缺少图片路径`);
+    assert.ok(/\.webp$/i.test(relPath.trim()), `${label} 必须使用 .webp 高清轻量化图片: ${relPath}`);
     const abs = path.join(ROOT, relPath);
     assert.ok(fs.existsSync(abs), `${label} 图片文件不存在: ${relPath}`);
     const size = fs.statSync(abs).size;
     assert.ok(size > 1024, `${label} 图片文件过小（疑似损坏）: ${relPath} (${size} bytes)`);
+    assert.ok(size <= MAX_BOOK_IMAGE_BYTES, `${label} 图片体积过大 (${Math.round(size / 1024)} KB > 350 KB): ${relPath}`);
+    if (referencedSet) {
+        referencedSet.add(path.resolve(abs));
+    }
 }
 
 function assertPinyinAligned(text, pinyin, label) {
@@ -39,10 +49,14 @@ function assertPinyinAligned(text, pinyin, label) {
 }
 
 function main() {
-    // 1. 验证 edgeTtsMod 核心纯函数可用性
+    // 1. 验证 edgeTtsMod 核心纯函数可用性及主声线均为 zh-CN-*
     const secMsGec = generateSecMsGecV2(1700000000);
     assert.match(secMsGec, /^[0-9A-F]{16}-[0-9A-F]{64}$/, 'Sec-MS-GEC v2 令牌格式异常');
     assert.equal(stripSpeechTextForTts('小豌豆🐰真棒！'), '小豌豆真棒！', 'stripSpeechTextForTts 清洗异常');
+    for (const roleKey of PRIMARY_STORY_ROLES) {
+        const cfg = ROLE_NEURAL_VOICES[roleKey];
+        assert.ok(cfg?.voice?.startsWith('zh-CN-'), `故事屋核心角色 ${roleKey} 应使用大陆 zh-CN-* 声线，当前为 ${cfg?.voice}`);
+    }
 
     // 2. 验证 version.json
     const versionData = readJson('version.json');
@@ -60,13 +74,14 @@ function main() {
 
     for (const entry of manifest.books) {
         assert.ok(entry.id && /^[a-z0-9-]+$/.test(entry.id), `非法 book id: ${entry.id}`);
-        assertImageFile(entry.cover, `manifest[${entry.id}].cover`);
+        const referencedImages = new Set();
+        assertImageFile(entry.cover, `manifest[${entry.id}].cover`, referencedImages);
 
         const bookRel = `books/${entry.id}/book.json`;
         const book = readJson(bookRel);
         assert.equal(book.id, entry.id, `${bookRel} 的 id 与 manifest 不一致`);
         assert.ok(book.artStyleBible && book.artStyleBible.length > 30, `${bookRel} 缺少 artStyleBible`);
-        assertImageFile(book.cover, `${bookRel}.cover`);
+        assertImageFile(book.cover, `${bookRel}.cover`, referencedImages);
         totalImagesChecked += 1;
 
         assertPinyinAligned(book.title, book.titlePinyin, `${bookRel}.title`);
@@ -90,7 +105,7 @@ function main() {
             assertPinyinAligned(page.title, page.titlePinyin, `${pLabel}.title`);
             totalPinyinChecked += 1;
 
-            assertImageFile(page.illustration, `${pLabel}.illustration`);
+            assertImageFile(page.illustration, `${pLabel}.illustration`, referencedImages);
             totalImagesChecked += 1;
 
             assert.ok(Array.isArray(page.storyParagraphs) && page.storyParagraphs.length > 0, `${pLabel}.storyParagraphs 不能为空`);
@@ -104,7 +119,7 @@ function main() {
 
             page.panels.forEach((panel, panelIdx) => {
                 const panLabel = `${pLabel}.panels[${panelIdx}]`;
-                assertImageFile(panel.image, `${panLabel}.image`);
+                assertImageFile(panel.image, `${panLabel}.image`, referencedImages);
                 totalImagesChecked += 1;
 
                 if (panel.caption) {
@@ -121,6 +136,15 @@ function main() {
                 });
             });
         });
+
+        const imagesDir = path.join(ROOT, 'books', entry.id, 'images');
+        if (fs.existsSync(imagesDir)) {
+            for (const fname of fs.readdirSync(imagesDir)) {
+                if (fname.startsWith('.')) continue;
+                const full = path.resolve(imagesDir, fname);
+                assert.ok(referencedImages.has(full), `发现未被 book.json 引用的孤儿图片: books/${entry.id}/images/${fname}`);
+            }
+        }
     }
 
     console.log(

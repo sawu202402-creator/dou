@@ -117,9 +117,12 @@ export class StoryMailboxController {
             updatedAt: 0,
             updatedBy: '',
             watcherLastSeenAt: 0,
-            watcherOnline: false
+            watcherOnline: false,
+            expiresAt: 0,
+            remainingMinutes: 0
         };
         this._patrolBusy = false;
+        this._lastRenderedFingerprint = '';
 
         this.isOpen = false;
         this.isRecording = false;
@@ -180,8 +183,17 @@ export class StoryMailboxController {
         this.syncFromCloud().catch(() => {});
         if (!this._syncTimer && typeof setInterval !== 'undefined') {
             this._syncTimer = setInterval(() => {
+                if (typeof document !== 'undefined' && document.hidden) return;
                 this.syncFromCloud().catch(() => {});
             }, 15000);
+        }
+        if (typeof document !== 'undefined' && !this._onVisibilityChange) {
+            this._onVisibilityChange = () => {
+                if (document.visibilityState === 'visible') {
+                    this.syncFromCloud().catch(() => {});
+                }
+            };
+            document.addEventListener('visibilitychange', this._onVisibilityChange);
         }
     }
 
@@ -300,6 +312,10 @@ export class StoryMailboxController {
                             <span id="smSendText">发送给画师</span>
                         </button>
                     </div>
+                    <div id="smWakePrompt" class="sm-wake-prompt" hidden>
+                        <span>🌙 点子已存好，画师正在休息中～</span>
+                        <button type="button" id="smWakeNowBtn" class="sm-wake-btn">✨ 召唤画师立刻来画</button>
+                    </div>
                     <div id="smStatusHint" class="sm-status-hint">✨ 你说的每一句话，画师都会用心变成新绘本和新漫画哦！</div>
                 </footer>
             </div>
@@ -325,6 +341,8 @@ export class StoryMailboxController {
             micText: overlay.querySelector('#smMicText'),
             sendBtn: overlay.querySelector('#smSendBtn'),
             sendText: overlay.querySelector('#smSendText'),
+            wakePrompt: overlay.querySelector('#smWakePrompt'),
+            wakeNowBtn: overlay.querySelector('#smWakeNowBtn'),
             statusHint: overlay.querySelector('#smStatusHint')
         };
 
@@ -336,6 +354,11 @@ export class StoryMailboxController {
         this.dom.patrolSwitch?.addEventListener('click', () => {
             this.audioEngine?.unlockInGesture?.();
             this.togglePatrol();
+        });
+
+        this.dom.wakeNowBtn?.addEventListener('click', () => {
+            this.audioEngine?.unlockInGesture?.();
+            this.setPatrolEnabled(true);
         });
 
         this.dom.micBtn.addEventListener('click', () => {
@@ -395,8 +418,13 @@ export class StoryMailboxController {
             updatedAt: Number(rawPatrol.updatedAt) || 0,
             updatedBy: String(rawPatrol.updatedBy || ''),
             watcherLastSeenAt: Number(rawPatrol.watcherLastSeenAt) || 0,
-            watcherOnline: Boolean(rawPatrol.watcherOnline)
+            watcherOnline: Boolean(rawPatrol.watcherOnline),
+            expiresAt: Number(rawPatrol.expiresAt) || 0,
+            remainingMinutes: Number(rawPatrol.remainingMinutes) || 0
         };
+        if (this.patrol.enabled && this.dom.wakePrompt) {
+            this.dom.wakePrompt.hidden = true;
+        }
         this._renderPatrolBar();
         this.onPatrolChange(this.patrol);
     }
@@ -410,6 +438,7 @@ export class StoryMailboxController {
 
         const enabled = Boolean(this.patrol.enabled);
         const watcherOnline = Boolean(this.patrol.watcherOnline);
+        const remainingMinutes = Number(this.patrol.remainingMinutes) || 0;
 
         bar.classList.toggle('is-on', enabled);
         bar.classList.toggle('is-off', !enabled);
@@ -420,8 +449,9 @@ export class StoryMailboxController {
 
         if (enabled) {
             titleEl.textContent = '✨ 画师自动巡检：已开启';
+            const ttlNote = remainingMinutes > 0 ? `（约 ${remainingMinutes} 分钟无新留言自动休息）` : '';
             subEl.textContent = watcherOnline
-                ? '电脑画师正在值守，发完故事点子会自动动笔画书！'
+                ? `电脑画师正在值守，发完点子会自动动笔${ttlNote}`
                 : '开关已打开，等待电脑端零能耗哨兵上线接收留言…';
         } else {
             titleEl.textContent = '🌙 画师自动巡检：已关闭';
@@ -555,7 +585,7 @@ export class StoryMailboxController {
 
         const unread = this.getUnreadReplies();
         this._markAllRepliesRead();
-        this.renderTimeline();
+        this.renderTimeline({ forceScroll: true });
         this._syncActionButtons();
 
         this.syncFromCloud().catch(() => {});
@@ -582,8 +612,22 @@ export class StoryMailboxController {
         this._syncPlayingHighlight();
     }
 
-    renderTimeline() {
-        if (!this.dom.stream) return;
+    _getTimelineFingerprint() {
+        const wPart = (this.state.wishes || [])
+            .map((w) => `${w.id}:${w.status || ''}:${w.syncedCloud ? 1 : 0}:${(w.instantReplyText || '').length}`)
+            .join('|');
+        const rPart = (this.cloudReplies || [])
+            .map((r) => `${r.id}:${r.bookId || ''}:${r.pageNumber || 1}:${(r.text || '').length}`)
+            .join('|');
+        return `${this._thinkingWishId || ''}#${wPart}#${rPart}`;
+    }
+
+    renderTimeline({ forceScroll = false } = {}) {
+        const stream = this.dom.stream;
+        if (!stream) return;
+
+        const prevScrollTop = stream.scrollTop;
+        const wasNearBottom = (stream.scrollHeight - stream.scrollTop - stream.clientHeight) < 72;
 
         const wishes = [...(this.state.wishes || [])];
         const replies = [...(this.cloudReplies || [])];
@@ -670,8 +714,13 @@ export class StoryMailboxController {
             }
         }
 
-        this.dom.stream.innerHTML = parts.join('');
-        this.dom.stream.scrollTop = this.dom.stream.scrollHeight;
+        this._lastRenderedFingerprint = this._getTimelineFingerprint();
+        stream.innerHTML = parts.join('');
+        if (forceScroll || wasNearBottom) {
+            stream.scrollTop = stream.scrollHeight;
+        } else {
+            stream.scrollTop = prevScrollTop;
+        }
         this._syncPlayingHighlight();
     }
 
@@ -915,6 +964,9 @@ export class StoryMailboxController {
             let uploadCtype = 'application/octet-stream';
             const elapsedSec = (Date.now() - (rec.startedAt || Date.now())) / 1000;
 
+            const ctx = this.getContext() || {};
+            const whisperHints = String(ctx.whisperHints || '').trim().slice(0, 140);
+
             if (rec.mode === 'mediarecorder' && rec.mediaRecorder) {
                 await new Promise((resolve) => {
                     if (rec.mediaRecorder.state === 'inactive') {
@@ -944,7 +996,7 @@ export class StoryMailboxController {
                 if (transcribeNow) {
                     const wav = encodePcmChunksToWav16kBase64(rec.chunks, rec.sampleRate);
                     if (wav.base64 && wav.durationSec >= 0.2) {
-                        uploadBody = JSON.stringify({ audioBase64: wav.base64 });
+                        uploadBody = JSON.stringify({ audioBase64: wav.base64, hints: whisperHints });
                         uploadCtype = 'application/json';
                     }
                 }
@@ -967,9 +1019,13 @@ export class StoryMailboxController {
             this._syncActionButtons();
 
             try {
+                const reqHeaders = { 'Content-Type': uploadCtype };
+                if (whisperHints && uploadCtype !== 'application/json') {
+                    reqHeaders['X-Story-Hints'] = encodeURIComponent(whisperHints);
+                }
                 const res = await fetch('/api/mailbox/transcribe', {
                     method: 'POST',
-                    headers: { 'Content-Type': uploadCtype },
+                    headers: reqHeaders,
                     body: uploadBody
                 });
                 if (res.status === 404 || res.status === 405 || res.status === 501) {
@@ -1046,7 +1102,7 @@ export class StoryMailboxController {
         this.dom.textInput.value = '';
         this._saveLocalState();
         this._syncActionButtons();
-        this.renderTimeline();
+        this.renderTimeline({ forceScroll: true });
         this.dom.statusHint.textContent = '🔮 魔法画师正在认真听你的点子…';
 
         try {
@@ -1073,6 +1129,9 @@ export class StoryMailboxController {
                         if (Array.isArray(data.replies)) {
                             this.cloudReplies = data.replies;
                         }
+                        if (data.patrol && typeof data.patrol === 'object') {
+                            this._applyPatrolState(data.patrol);
+                        }
                     }
                 }
             }
@@ -1087,7 +1146,7 @@ export class StoryMailboxController {
             wish.instantReplyText = replyText;
             this._thinkingWishId = null;
             this._saveLocalState();
-            this.renderTimeline();
+            this.renderTimeline({ forceScroll: true });
             this.refreshBadges();
 
             const playKey = `inst_${wish.id}`;
@@ -1102,15 +1161,24 @@ export class StoryMailboxController {
                 }
             });
 
-            this.dom.statusHint.textContent = wish.syncedCloud
-                ? '☁️ 已同步到云端魔法画本！画师画好后会发语音回信给你哦～'
-                : '📮 已记录到本地魔法画本！部署上线后即可同步云端并实时语音陪聊～';
+            if (wish.syncedCloud) {
+                if (this.patrol.enabled) {
+                    if (this.dom.wakePrompt) this.dom.wakePrompt.hidden = true;
+                    this.dom.statusHint.textContent = '☁️ 已同步到云端魔法画本！画师正在值守，画好会发语音回信哦～';
+                } else {
+                    if (this.dom.wakePrompt) this.dom.wakePrompt.hidden = false;
+                    this.dom.statusHint.textContent = '🌙 已存入云端画本！点上方「✨ 召唤画师立刻来画」就能立刻动笔哦～';
+                }
+            } else {
+                if (this.dom.wakePrompt) this.dom.wakePrompt.hidden = true;
+                this.dom.statusHint.textContent = '📮 已记录到本地魔法画本！部署上线后即可同步云端并实时语音陪聊～';
+            }
         } catch (_) {
             this._thinkingWishId = null;
             wish.instantReplyKey = 'local_fallback';
             wish.instantReplyText = `收到小豌豆的奇思妙想啦！我已经把你的好点子记在魔法画本里了！`;
             this._saveLocalState();
-            this.renderTimeline();
+            this.renderTimeline({ forceScroll: true });
         } finally {
             this.isSending = false;
             this._syncActionButtons();
@@ -1166,7 +1234,10 @@ export class StoryMailboxController {
 
             if (this.isOpen) {
                 this._markAllRepliesRead();
-                this.renderTimeline();
+                const nextFp = this._getTimelineFingerprint();
+                if (nextFp !== this._lastRenderedFingerprint) {
+                    this.renderTimeline({ forceScroll: false });
+                }
             } else if (newlyArrived.length > 0) {
                 this.onNewReply(newlyArrived[newlyArrived.length - 1]);
             }

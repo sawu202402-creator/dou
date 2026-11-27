@@ -110,7 +110,9 @@ async function main() {
             const pendingWishes = Array.isArray(data.pendingWishes) ? data.pendingWishes : [];
 
             if (once || lastPatrolEnabled === null || lastPatrolEnabled !== patrolEnabled) {
-                const stateLabel = patrolEnabled ? `开启（高频 ${activeSec}s 巡检）` : `关闭（低频 ${idleSec}s 待命）`;
+                const rem = Number(data.patrol?.remainingMinutes) || 0;
+                const ttlStr = patrolEnabled && rem > 0 ? `，约 ${rem} 分钟后自动休息` : '';
+                const stateLabel = patrolEnabled ? `开启（高频 ${activeSec}s 巡检${ttlStr}）` : `关闭（低频 ${idleSec}s 待命）`;
                 console.log(`[${ts()}] 🎛️ 网页巡检开关：${stateLabel} · 待处理留言：${pendingCount} 条`);
                 lastPatrolEnabled = patrolEnabled;
             }

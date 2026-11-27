@@ -49,11 +49,26 @@ function detectMimeFromBase64(b64) {
     return 'audio/mpeg';
 }
 
+const TTS_DISK_CACHE_NAME = 'pea-story-tts-v2';
+
+function hashTextKey(str) {
+    let h1 = 0x811c9dc5;
+    let h2 = 0x9e3779b9;
+    const s = String(str || '');
+    for (let i = 0; i < s.length; i++) {
+        const ch = s.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 0x01000193) >>> 0;
+        h2 = Math.imul(h2 ^ (ch + i), 0x85ebca6b) >>> 0;
+    }
+    return `${h1.toString(36)}_${h2.toString(36)}_${s.length}`;
+}
+
 export class StoryAudioEngine {
-    constructor({ onStateChange } = {}) {
+    constructor({ onStateChange, playbackRate = 1.0 } = {}) {
         this.muted = false;
         this.isSpeaking = false;
         this.lastPlaybackMode = 'idle';
+        this.playbackRate = Math.max(0.75, Math.min(1.25, Number(playbackRate) || 1.0));
         this.onStateChange = typeof onStateChange === 'function' ? onStateChange : () => {};
 
         this._audioCtx = null;
@@ -68,6 +83,7 @@ export class StoryAudioEngine {
         this._activeFallbackTimer = null;
         this._ttsMemCache = new Map();
         this._inflightTtsMap = new Map();
+        this._cacheEpoch = 0;
         this._cloudTtsUnavailable = false;
         this._pendingGesturePlay = null;
 
@@ -82,6 +98,7 @@ export class StoryAudioEngine {
             muted: this.muted,
             isSpeaking: this.isSpeaking,
             lastPlaybackMode: this.lastPlaybackMode,
+            playbackRate: this.playbackRate,
             hasPendingGesturePlay: Boolean(this._pendingGesturePlay)
         });
     }
@@ -192,8 +209,68 @@ export class StoryAudioEngine {
         }
     }
 
-    clearCache() {
+    setPlaybackRate(rate) {
+        const next = Math.max(0.75, Math.min(1.25, Number(rate) || 1.0));
+        if (Math.abs(next - this.playbackRate) < 0.001) return;
+        this.playbackRate = next;
+        this._notify();
+    }
+
+    async clearCache() {
+        this._cacheEpoch += 1;
         this._ttsMemCache.clear();
+        this._inflightTtsMap.clear();
+        if (typeof window !== 'undefined' && typeof caches !== 'undefined' && window.isSecureContext) {
+            try {
+                await caches.delete(TTS_DISK_CACHE_NAME);
+            } catch (_) {}
+        }
+    }
+
+    _canUseDiskCache() {
+        return (
+            typeof window !== 'undefined' &&
+            typeof caches !== 'undefined' &&
+            window.isSecureContext &&
+            window.__DISABLE_TTS_DISK_CACHE !== true
+        );
+    }
+
+    async _readDiskCache(cacheKey) {
+        if (!this._canUseDiskCache()) return '';
+        try {
+            const cache = await caches.open(TTS_DISK_CACHE_NAME);
+            const url = `https://pea-tts-disk.local/v2/${hashTextKey(cacheKey)}`;
+            const resp = await cache.match(url);
+            if (!resp) return '';
+            const text = await resp.text();
+            return text && text.length > 40 ? text : '';
+        } catch (_) {
+            return '';
+        }
+    }
+
+    async _writeDiskCache(cacheKey, b64) {
+        if (!this._canUseDiskCache() || !b64 || b64.length <= 40) return;
+        try {
+            const cache = await caches.open(TTS_DISK_CACHE_NAME);
+            const existingKeys = await cache.keys();
+            if (existingKeys.length >= 220) {
+                for (const req of existingKeys.slice(0, 30)) {
+                    await cache.delete(req);
+                }
+            }
+            const url = `https://pea-tts-disk.local/v2/${hashTextKey(cacheKey)}`;
+            await cache.put(url, new Response(b64, { headers: { 'Content-Type': 'text/plain' } }));
+        } catch (_) {}
+    }
+
+    _saveToMemCache(cacheKey, b64) {
+        if (this._ttsMemCache.size >= 160) {
+            const oldest = this._ttsMemCache.keys().next().value;
+            if (oldest !== undefined) this._ttsMemCache.delete(oldest);
+        }
+        this._ttsMemCache.set(cacheKey, b64);
     }
 
     _clearTimers() {
@@ -248,12 +325,24 @@ export class StoryAudioEngine {
             return this._inflightTtsMap.get(cacheKey);
         }
 
+        const reqEpoch = this._cacheEpoch;
         const reqPromise = (async () => {
+            const diskHit = await this._readDiskCache(cacheKey);
+            if (diskHit) {
+                if (reqEpoch === this._cacheEpoch) {
+                    this._saveToMemCache(cacheKey, diskHit);
+                }
+                return diskHit;
+            }
+
+            const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeoutId = ctrl ? setTimeout(() => ctrl.abort(), 7000) : null;
             try {
                 const res = await fetch('/api/tts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: cleanText, role })
+                    body: JSON.stringify({ text: cleanText, role }),
+                    signal: ctrl ? ctrl.signal : undefined
                 });
                 if (res.status === 404 || res.status === 405 || res.status === 501) {
                     this._cloudTtsUnavailable = true;
@@ -262,15 +351,17 @@ export class StoryAudioEngine {
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.ok && data.audioBase64) {
-                        if (this._ttsMemCache.size >= 160) {
-                            const oldest = this._ttsMemCache.keys().next().value;
-                            if (oldest !== undefined) this._ttsMemCache.delete(oldest);
+                        if (reqEpoch === this._cacheEpoch) {
+                            this._saveToMemCache(cacheKey, data.audioBase64);
+                            this._writeDiskCache(cacheKey, data.audioBase64).catch(() => {});
                         }
-                        this._ttsMemCache.set(cacheKey, data.audioBase64);
                         return data.audioBase64;
                     }
                 }
-            } catch (_) {}
+            } catch (_) {
+            } finally {
+                if (timeoutId) clearTimeout(timeoutId);
+            }
             return '';
         })();
 
@@ -312,10 +403,11 @@ export class StoryAudioEngine {
                         if (token !== this._speakToken || this.muted) {
                             return { played: false, reason: 'cancelled' };
                         }
-                        const durationMs = Math.max(80, Math.ceil(decoded.duration * 1000));
+                        const durationMs = Math.max(80, Math.ceil((decoded.duration / this.playbackRate) * 1000));
                         return await new Promise((resolve) => {
                             const src = this._audioCtx.createBufferSource();
                             src.buffer = decoded;
+                            src.playbackRate.value = this.playbackRate;
                             src.connect(this._audioCtx.destination);
                             this._activeBufferSrc = src;
                             this.lastPlaybackMode = 'neural-mp3';
@@ -343,6 +435,7 @@ export class StoryAudioEngine {
                 const mime = detectMimeFromBase64(b64);
                 audio.setAttribute('playsinline', 'true');
                 audio.src = `data:${mime};base64,${b64}`;
+                audio.playbackRate = this.playbackRate;
                 this._activeHtmlAudio = audio;
                 return await new Promise((resolve) => {
                     let settled = false;
@@ -389,7 +482,7 @@ export class StoryAudioEngine {
                 utter.lang = 'zh-CN';
                 const chosen = profile.male ? this._zhMaleVoice : this._zhFemaleVoice;
                 if (chosen) utter.voice = chosen;
-                utter.rate = profile.rate;
+                utter.rate = Math.max(0.65, Math.min(1.3, profile.rate * this.playbackRate));
                 utter.pitch = profile.pitch;
                 utter.volume = 1.0;
 
@@ -402,7 +495,7 @@ export class StoryAudioEngine {
                 };
                 utter.onend = () => done(true);
                 utter.onerror = () => done(false);
-                const approxMs = Math.max(1200, Math.min(25000, cleanText.length * 240));
+                const approxMs = Math.max(1200, Math.min(28000, Math.ceil((cleanText.length * 240) / this.playbackRate)));
                 this._activeFallbackTimer = setTimeout(() => done(true), approxMs);
                 this.lastPlaybackMode = 'speechSynthesis';
                 window.speechSynthesis.speak(utter);
@@ -424,6 +517,7 @@ export class StoryAudioEngine {
         this.stop();
         const token = ++this._speakToken;
         this.isSpeaking = true;
+        this.lastPlaybackMode = 'idle';
         this._pendingGesturePlay = null;
         this._notify();
         if (typeof callbacks.onStart === 'function') {
@@ -501,12 +595,15 @@ export class StoryAudioEngine {
         }
 
         if (cleanFallback) {
-            this._ttsMemCache.set(`${role}::${cleanFallback}`, cleanB64);
+            const cacheKey = `${role}::${cleanFallback}`;
+            this._saveToMemCache(cacheKey, cleanB64);
+            this._writeDiskCache(cacheKey, cleanB64).catch(() => {});
         }
 
         this.stop();
         const token = ++this._speakToken;
         this.isSpeaking = true;
+        this.lastPlaybackMode = 'idle';
         this._pendingGesturePlay = null;
         this._notify();
         if (typeof callbacks.onStart === 'function') {

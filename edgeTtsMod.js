@@ -71,10 +71,10 @@ export const ROLE_NEURAL_VOICES = {
     rabbit:          { voice: "zh-CN-XiaoyiNeural",   rate: "+5%", pitch: "+6Hz" },
     frog:         { voice: "zh-CN-YunxiaNeural",   rate: "+4%", pitch: "+3Hz" },
     shiba:        { voice: "zh-CN-YunxiaNeural",   rate: "+6%", pitch: "+5Hz" },
-    panda:        { voice: "zh-TW-HsiaoChenNeural",rate: "-4%", pitch: "-2Hz" },
+    panda:        { voice: "zh-CN-YunxiaNeural",   rate: "-4%", pitch: "-2Hz" },
     tiger:        { voice: "zh-CN-YunxiNeural",    rate: "+2%", pitch: "-3Hz" },
     unicorn:      { voice: "zh-CN-XiaoxiaoNeural", rate: "+0%", pitch: "+4Hz" },
-    succulent:    { voice: "zh-TW-HsiaoYuNeural",  rate: "+2%", pitch: "+5Hz" },
+    succulent:    { voice: "zh-CN-XiaoyiNeural",   rate: "+2%", pitch: "+5Hz" },
     pixiu:        { voice: "zh-CN-XiaoyiNeural",   rate: "+6%", pitch: "+4Hz" },
     astro_rabbit: { voice: "zh-CN-XiaoyiNeural",   rate: "+5%", pitch: "+5Hz" },
     prince_frog:  { voice: "zh-CN-YunxiNeural",    rate: "-1%", pitch: "+0Hz" },
@@ -86,13 +86,17 @@ export const ROLE_NEURAL_VOICES = {
     system_notice: { voice: "zh-CN-XiaoxiaoNeural", rate: "+0%", pitch: "+3Hz" },
     pea:           { voice: "zh-CN-XiaoyiNeural",   rate: "+3%", pitch: "+5Hz" },
     bunny:         { voice: "zh-CN-XiaoyiNeural",   rate: "+6%", pitch: "+7Hz" },
-    bear:          { voice: "zh-TW-HsiaoChenNeural",rate: "-6%", pitch: "-3Hz" },
+    bear:          { voice: "zh-CN-YunxiNeural",    rate: "-7%", pitch: "-3Hz" },
     star_boy:      { voice: "zh-CN-YunxiaNeural",   rate: "+5%", pitch: "+4Hz" },
     prince:        { voice: "zh-CN-YunxiNeural",    rate: "+0%", pitch: "+0Hz" },
     grandpa:       { voice: "zh-CN-YunxiNeural",    rate: "-8%", pitch: "-6Hz" },
     fairy:         { voice: "zh-CN-XiaoxiaoNeural", rate: "+3%", pitch: "+5Hz" },
     cat:           { voice: "zh-CN-XiaoyiNeural",   rate: "+5%", pitch: "+6Hz" }
 };
+
+export function getRoleVoiceProfile(roleKey = "narrator") {
+    return ROLE_NEURAL_VOICES[roleKey] || ROLE_NEURAL_VOICES.narrator;
+}
 
 function rol16(val) {
     const v = val & MASK;
@@ -355,7 +359,7 @@ export async function synthesizeNeuralMp3Base64(rawText, roleKey = "narrator") {
         `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"true","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n`;
 
     const ssmlBody =
-        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>` +
+        `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='zh-CN'>` +
         `<voice name='${cfg.voice}'>` +
         `<prosody pitch='${cfg.pitch}' rate='${cfg.rate}' volume='+0%'>` +
         `${escapeXml(cleanText)}` +

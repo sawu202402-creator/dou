@@ -19,12 +19,30 @@ export function buildComicBubbleSpeakKey(bookId, pageNumber, panelIdx, bubbleIdx
 /**
  * 渲染个人专属书架
  */
-export function renderBookshelf(container, books, { latestBookId = '', updatedJustNow = false, onOpenBook, onOpenMailbox } = {}) {
+export function renderBookshelf(container, books, {
+    latestBookId = '',
+    updatedJustNow = false,
+    readingProgress = {},
+    onOpenBook,
+    onHoverBook,
+    onOpenMailbox
+} = {}) {
     if (!container) return;
 
     const cardsHtml = (books || []).map((book) => {
         const isFresh = updatedJustNow && book.id === latestBookId;
         const tagsHtml = (book.tags || []).slice(0, 3).map(t => `<span class="shelf-tag">${escapeHtml(t)}</span>`).join('');
+        const pageCount = Math.max(1, Number(book.pageCount) || 1);
+        const prog = readingProgress?.[book.id];
+        let progressHtml = '';
+        if (prog && Number.isFinite(Number(prog.pageIndex))) {
+            const pNum = Math.max(1, Math.min(pageCount, Number(prog.pageIndex) + 1));
+            if (pNum >= pageCount) {
+                progressHtml = `<span class="progress-pill is-done">🌟 已读完</span>`;
+            } else if (pNum > 1) {
+                progressHtml = `<span class="progress-pill">🔖 读到第 ${pNum} 页</span>`;
+            }
+        }
         return `
             <article class="book-card ${isFresh ? 'is-fresh' : ''}" data-book-id="${escapeHtml(book.id)}" tabindex="0" role="button" aria-label="打开《${escapeHtml(book.title)}》">
                 ${isFresh ? '<div class="fresh-ribbon">✨ 刚刚上新</div>' : ''}
@@ -36,8 +54,8 @@ export function renderBookshelf(container, books, { latestBookId = '', updatedJu
                     <h2 class="book-card-title">${escapeHtml(book.emoji || '📖')} ${escapeHtml(book.title)}</h2>
                     <p class="book-card-sub">${escapeHtml(book.subtitle || '')}</p>
                     <div class="book-card-meta">
-                        <span class="page-pill">📖 ${Number(book.pageCount) || 1} 页</span>
-                        <span class="mode-pill">绘本 · 漫画</span>
+                        <span class="page-pill">📖 ${pageCount} 页</span>
+                        ${progressHtml || '<span class="mode-pill">绘本 · 漫画</span>'}
                     </div>
                     ${tagsHtml ? `<div class="book-card-tags">${tagsHtml}</div>` : ''}
                 </div>
@@ -69,13 +87,20 @@ export function renderBookshelf(container, books, { latestBookId = '', updatedJu
     `;
 
     container.querySelectorAll('.book-card').forEach((card) => {
+        const bookId = card.getAttribute('data-book-id');
         const open = () => {
-            const bookId = card.getAttribute('data-book-id');
             if (bookId && typeof onOpenBook === 'function') {
                 onOpenBook(bookId);
             }
         };
+        const warm = () => {
+            if (bookId && typeof onHoverBook === 'function') {
+                onHoverBook(bookId);
+            }
+        };
         card.addEventListener('click', open);
+        card.addEventListener('pointerenter', warm, { once: true });
+        card.addEventListener('touchstart', warm, { passive: true, once: true });
         card.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -169,7 +194,8 @@ export function renderComicPage(container, book, page, {
     pageIndex = 0,
     totalPages = 1,
     speakingKey = '',
-    onSpeakItem
+    onSpeakItem,
+    onZoomImage
 } = {}) {
     if (!container || !book || !page) return;
 
@@ -248,7 +274,9 @@ export function renderComicPage(container, book, page, {
             <div class="comic-panel panel-idx-${pIdx}" data-panel-idx="${pIdx}">
                 ${captionHtml}
                 <div class="comic-art-box">
-                    <img src="${escapeHtml(panel.image)}" alt="${escapeHtml(panel.caption || page.title)}" class="comic-panel-img" decoding="async"${pIdx === 0 ? ' fetchpriority="high"' : ''}>
+                    <button type="button" class="comic-art-zoom-btn" data-zoom-src="${escapeHtml(panel.image)}" data-zoom-caption="${escapeHtml(panel.caption || page.title)}" aria-label="点击放大查看第 ${pIdx + 1} 格插画">
+                        <img src="${escapeHtml(panel.image)}" alt="${escapeHtml(panel.caption || page.title)}" class="comic-panel-img" decoding="async"${pIdx === 0 ? ' fetchpriority="high"' : ''}>
+                    </button>
                     ${stickersHtml}
                     <span class="panel-number-tag">${pIdx + 1}</span>
                 </div>
@@ -266,7 +294,7 @@ export function renderComicPage(container, book, page, {
                 </div>
                 <div class="comic-cast-bar">
                     <div class="cast-pills">${castPills}</div>
-                    <span class="comic-tap-tip">💡 点对话气泡，听角色用自己的声音说话！</span>
+                    <span class="comic-tap-tip">💡 点气泡听角色配音，点图画可放大看细节！</span>
                 </div>
             </header>
             <div class="comic-grid" data-layout="${escapeHtml(layout)}" data-panel-count="${panels.length}">
@@ -274,6 +302,16 @@ export function renderComicPage(container, book, page, {
             </div>
         </section>
     `;
+
+    container.querySelectorAll('.comic-art-zoom-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const src = btn.getAttribute('data-zoom-src');
+            const caption = btn.getAttribute('data-zoom-caption') || '';
+            if (src && typeof onZoomImage === 'function') {
+                onZoomImage({ src, caption });
+            }
+        });
+    });
 
     container.querySelectorAll('[data-kind="caption"]').forEach((btn) => {
         btn.addEventListener('click', () => {

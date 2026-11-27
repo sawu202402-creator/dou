@@ -98,8 +98,10 @@ async function cmdPull(args) {
     console.log(`   共收到小豌豆留言 ${wishes.length} 条 · 已发画师回信 ${replies.length} 封`);
     if (data.patrol && typeof data.patrol === 'object') {
         const swLabel = data.patrol.enabled ? '开启' : '关闭';
+        const rem = Number(data.patrol.remainingMinutes) || 0;
+        const ttlStr = data.patrol.enabled && rem > 0 ? `（约 ${rem} 分钟后自动休息）` : '';
         const watcherLabel = data.patrol.watcherOnline ? '在线' : '未运行';
-        console.log(`   巡检开关: ${swLabel} · 电脑哨兵: ${watcherLabel}`);
+        console.log(`   巡检开关: ${swLabel}${ttlStr} · 电脑哨兵: ${watcherLabel}`);
     }
     console.log('');
 
@@ -140,9 +142,16 @@ async function cmdReply(args) {
         text
     };
 
+    const cfg = loadConfig();
+    const adminToken = String(args.token || process.env.MAILBOX_ADMIN_TOKEN || cfg.adminToken || '').trim();
+    const headers = { 'Content-Type': 'application/json' };
+    if (adminToken) {
+        headers.Authorization = `Bearer ${adminToken}`;
+    }
+
     const res = await fetch(`${baseUrl}/api/mailbox/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(entry)
     });
     if (!res.ok) {
@@ -167,8 +176,10 @@ async function cmdPatrol(args) {
         }
         const data = await res.json();
         const swLabel = data.patrol?.enabled ? '开启' : '关闭';
+        const rem = Number(data.patrol?.remainingMinutes) || 0;
+        const ttlStr = data.patrol?.enabled && rem > 0 ? `（约 ${rem} 分钟后自动休息）` : '';
         const watcherLabel = data.patrol?.watcherOnline ? '在线' : '未运行';
-        console.log(`🎛️ 网页巡检开关已切换为【${swLabel}】 (${baseUrl})`);
+        console.log(`🎛️ 网页巡检开关已切换为【${swLabel}】${ttlStr} (${baseUrl})`);
         console.log(`   电脑哨兵: ${watcherLabel}`);
         return;
     }
@@ -181,8 +192,10 @@ async function cmdPatrol(args) {
     }
     const data = await res.json();
     const swLabel = data.patrol?.enabled ? '开启' : '关闭';
+    const rem = Number(data.patrol?.remainingMinutes) || 0;
+    const ttlStr = data.patrol?.enabled && rem > 0 ? `（约 ${rem} 分钟后自动休息）` : '';
     const watcherLabel = data.patrol?.watcherOnline ? '在线' : '未运行';
-    console.log(`🎛️ 网页巡检开关: ${swLabel} · 电脑哨兵: ${watcherLabel} · 待处理留言: ${Number(data.pendingCount) || 0} 条 (${baseUrl})`);
+    console.log(`🎛️ 网页巡检开关: ${swLabel}${ttlStr} · 电脑哨兵: ${watcherLabel} · 待处理留言: ${Number(data.pendingCount) || 0} 条 (${baseUrl})`);
 }
 
 async function main() {
@@ -201,6 +214,14 @@ async function main() {
         return;
     }
 
+    if (cmd === 'set-token') {
+        const token = String(args._[1] || args.token || '').trim();
+        const cfg = loadConfig();
+        saveConfig({ ...cfg, adminToken: token });
+        console.log(token ? '✅ 已保存可选管理密钥 adminToken 到 .mailbox-config.json' : '✅ 已清除 adminToken');
+        return;
+    }
+
     if (cmd === 'pull') {
         await cmdPull(args);
         return;
@@ -216,7 +237,7 @@ async function main() {
         return;
     }
 
-    console.log('支持的命令: set-url | pull | reply | patrol [status|on|off]');
+    console.log('支持的命令: set-url | set-token | pull | reply | patrol [status|on|off]');
 }
 
 main().catch((err) => {

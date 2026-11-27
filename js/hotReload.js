@@ -26,6 +26,7 @@ export class HotReloadWatcher {
         this._running = true;
         this.checkNow().catch(() => {});
         this._timer = setInterval(() => {
+            if (typeof document !== 'undefined' && document.hidden) return;
             this.checkNow().catch(() => {});
         }, this.intervalMs);
         if (typeof document !== 'undefined') {

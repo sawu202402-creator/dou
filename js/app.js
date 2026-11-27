@@ -17,6 +17,9 @@ import {
 } from './bookRenderer.js';
 
 const STORAGE_PINYIN_KEY = 'pea_story_house_pinyin';
+const STORAGE_PROGRESS_KEY = 'pea_story_house_progress_v1';
+const STORAGE_MODE_KEY = 'pea_story_house_mode_v1';
+const STORAGE_SPEED_KEY = 'pea_story_house_speed_v1';
 
 const appEl = document.getElementById('app');
 const mainStageEl = document.getElementById('main-stage');
@@ -31,7 +34,11 @@ const btnTogglePinyin = document.getElementById('btn-toggle-pinyin');
 const btnAutoplay = document.getElementById('btn-autoplay');
 const autoplayIconEl = document.getElementById('autoplay-icon');
 const autoplayLabelEl = document.getElementById('autoplay-label');
+const btnSpeed = document.getElementById('btn-speed');
+const speedIconEl = document.getElementById('speed-icon');
+const speedLabelEl = document.getElementById('speed-label');
 const btnToggleMute = document.getElementById('btn-toggle-mute');
+const btnRefreshApp = document.getElementById('btn-refresh-app');
 const btnOpenMailbox = document.getElementById('btn-open-mailbox');
 const mailboxUnreadBadge = document.getElementById('mailbox-unread-badge');
 const readerFooterEl = document.getElementById('reader-footer');
@@ -39,6 +46,11 @@ const btnPrevPage = document.getElementById('btn-prev-page');
 const btnNextPage = document.getElementById('btn-next-page');
 const pageDotsEl = document.getElementById('page-dots');
 const pageCounterEl = document.getElementById('page-counter-text');
+
+const artLightboxEl = document.getElementById('art-lightbox');
+const artLightboxImgEl = document.getElementById('art-lightbox-img');
+const artLightboxCaptionEl = document.getElementById('art-lightbox-caption');
+const btnLightboxClose = document.getElementById('btn-lightbox-close');
 
 const hotBannerEl = document.getElementById('hot-reload-banner');
 const hotBannerMsgEl = document.getElementById('hot-reload-msg');
@@ -49,7 +61,10 @@ const btnBannerClose = document.getElementById('btn-banner-close');
 const state = {
     view: 'shelf',
     mode: 'storybook',
+    preferredMode: '',
     pinyinOn: true,
+    slowMode: false,
+    readingProgress: {},
     manifestBooks: [],
     bookCache: new Map(),
     currentBook: null,
@@ -68,9 +83,43 @@ const state = {
 try {
     const savedPinyin = localStorage.getItem(STORAGE_PINYIN_KEY);
     if (savedPinyin === 'off') state.pinyinOn = false;
+    const savedSpeed = localStorage.getItem(STORAGE_SPEED_KEY);
+    if (savedSpeed === 'slow') state.slowMode = true;
+    const savedMode = localStorage.getItem(STORAGE_MODE_KEY);
+    if (savedMode === 'storybook' || savedMode === 'comic') state.preferredMode = savedMode;
+    const savedProgress = localStorage.getItem(STORAGE_PROGRESS_KEY);
+    if (savedProgress) {
+        const parsed = JSON.parse(savedProgress);
+        if (parsed && typeof parsed === 'object') state.readingProgress = parsed;
+    }
 } catch (_) {}
 
+function saveCurrentProgress() {
+    const book = state.currentBook;
+    if (!book || !book.id) return;
+    state.readingProgress = {
+        ...(state.readingProgress || {}),
+        [book.id]: {
+            pageIndex: state.pageIndex,
+            mode: state.mode,
+            updatedAt: Date.now()
+        }
+    };
+    try {
+        localStorage.setItem(STORAGE_PROGRESS_KEY, JSON.stringify(state.readingProgress));
+    } catch (_) {}
+}
+
+function savePreferredMode(mode) {
+    if (mode !== 'storybook' && mode !== 'comic') return;
+    state.preferredMode = mode;
+    try {
+        localStorage.setItem(STORAGE_MODE_KEY, mode);
+    } catch (_) {}
+}
+
 const audioEngine = new StoryAudioEngine({
+    playbackRate: state.slowMode ? 0.85 : 1.0,
     onStateChange: (audioState) => {
         if (btnToggleMute) {
             btnToggleMute.textContent = audioState.muted ? '🔇' : '🔊';
@@ -81,13 +130,24 @@ const audioEngine = new StoryAudioEngine({
 
 const storyMailbox = new StoryMailboxController({
     audioEngine,
-    getContext: () => ({
-        view: state.view,
-        bookId: state.currentBook?.id || '',
-        bookTitle: state.currentBook?.title || '',
-        pageNumber: (state.pageIndex || 0) + 1,
-        mode: state.mode
-    }),
+    getContext: () => {
+        const charNames = Object.values(state.currentBook?.characters || {})
+            .map((c) => c?.name)
+            .filter(Boolean);
+        const bookTitles = (state.manifestBooks || [])
+            .slice(0, 4)
+            .map((b) => b?.title)
+            .filter(Boolean);
+        const whisperHints = Array.from(new Set([...charNames, ...bookTitles])).join('，').slice(0, 140);
+        return {
+            view: state.view,
+            bookId: state.currentBook?.id || '',
+            bookTitle: state.currentBook?.title || '',
+            pageNumber: (state.pageIndex || 0) + 1,
+            mode: state.mode,
+            whisperHints
+        };
+    },
     onBeforeOpen: () => stopAutoplay(),
     onJumpToBook: (bookId, pageNum) => openBook(bookId, pageNum, null, { flashMagic: true }),
     onNewReply: (reply) => {
@@ -124,9 +184,11 @@ function syncPatrolBadge() {
     liveTextEl.textContent = enabled ? '巡检：开' : '巡检：关';
 
     if (enabled) {
+        const remainingMinutes = Number(storyMailbox.patrol?.remainingMinutes) || 0;
+        const ttlSuffix = remainingMinutes > 0 ? `，剩余约 ${remainingMinutes} 分钟自动休息` : '';
         liveStatusEl.title = watcherOnline
-            ? '画师自动巡检已开启（电脑哨兵在线值守），点击可关闭'
-            : '画师自动巡检已开启（等待电脑端哨兵上线），点击可关闭';
+            ? `画师自动巡检已开启（电脑哨兵在线值守${ttlSuffix}），点击可关闭`
+            : `画师自动巡检已开启（等待电脑端哨兵上线${ttlSuffix}），点击可关闭`;
     } else {
         liveStatusEl.title = watcherOnline
             ? '画师自动巡检已关闭（平时零消耗，电脑哨兵待命中），点击开启'
@@ -168,6 +230,31 @@ function updateAutoplayButton() {
     autoplayLabelEl.textContent = state.autoplaying ? '暂停' : '连播';
 }
 
+function updateSpeedButton() {
+    if (!btnSpeed || !speedIconEl || !speedLabelEl) return;
+    btnSpeed.classList.toggle('is-on', state.slowMode);
+    btnSpeed.setAttribute('aria-pressed', String(state.slowMode));
+    speedIconEl.textContent = state.slowMode ? '🐢' : '🐇';
+    speedLabelEl.textContent = state.slowMode ? '慢读' : '常速';
+}
+
+function openArtLightbox({ src, caption = '' } = {}) {
+    if (!artLightboxEl || !artLightboxImgEl || !src) return;
+    artLightboxImgEl.src = src;
+    artLightboxImgEl.alt = caption || '故事插画大图';
+    if (artLightboxCaptionEl) {
+        artLightboxCaptionEl.textContent = caption;
+        artLightboxCaptionEl.hidden = !caption;
+    }
+    artLightboxEl.hidden = false;
+}
+
+function closeArtLightbox() {
+    if (!artLightboxEl || artLightboxEl.hidden) return;
+    artLightboxEl.hidden = true;
+    if (artLightboxImgEl) artLightboxImgEl.removeAttribute('src');
+}
+
 function syncChrome() {
     appEl.setAttribute('data-view', state.view);
     appEl.setAttribute('data-mode', state.mode);
@@ -177,6 +264,7 @@ function syncChrome() {
     btnBackShelf.hidden = !inReader;
     modeCapsuleEl.hidden = !inReader;
     btnAutoplay.hidden = !inReader;
+    if (btnSpeed) btnSpeed.hidden = !inReader;
     readerFooterEl.hidden = !inReader;
 
     if (inReader) {
@@ -197,6 +285,7 @@ function syncChrome() {
     btnTogglePinyin.setAttribute('aria-pressed', String(state.pinyinOn));
 
     updateAutoplayButton();
+    updateSpeedButton();
     syncFooterNavigation();
 }
 
@@ -466,6 +555,7 @@ async function startFullBookAutoplay() {
         const totalPages = book.pages?.length || 1;
         if (state.pageIndex < totalPages - 1) {
             state.pageIndex += 1;
+            saveCurrentProgress();
             renderCurrentView();
             await new Promise((r) => setTimeout(r, 260));
         } else {
@@ -487,9 +577,16 @@ function renderCurrentView({ flashMagic = false } = {}) {
         renderBookshelf(mainStageEl, state.manifestBooks, {
             latestBookId: state.updatedBookId,
             updatedJustNow: Boolean(state.updatedBookId),
+            readingProgress: state.readingProgress,
             onOpenBook: (bookId) => {
                 audioEngine.unlockInGesture();
-                openBook(bookId, 1);
+                openBook(bookId, null, null, { resumeProgress: true });
+            },
+            onHoverBook: (bookId) => {
+                fetchBook(bookId).then((b) => {
+                    const p = b?.pages?.[0];
+                    if (p?.illustration) preloadImages([p.illustration]);
+                }).catch(() => {});
             },
             onOpenMailbox: () => {
                 audioEngine.unlockInGesture();
@@ -524,7 +621,8 @@ function renderCurrentView({ flashMagic = false } = {}) {
             pageIndex: state.pageIndex,
             totalPages: pages.length,
             speakingKey: state.speakingKey,
-            onSpeakItem: ({ text, role, speakKey }) => speakSingle(text, role, speakKey)
+            onSpeakItem: ({ text, role, speakKey }) => speakSingle(text, role, speakKey),
+            onZoomImage: (info) => openArtLightbox(info)
         });
     }
 
@@ -537,19 +635,33 @@ function renderCurrentView({ flashMagic = false } = {}) {
     prefetchCurrentPage();
 }
 
-async function openBook(bookId, pageNum = 1, modeOverride = null, { flashMagic = false } = {}) {
+async function openBook(bookId, pageNum = 1, modeOverride = null, { flashMagic = false, resumeProgress = false } = {}) {
     stopAllSpeechAndAutoplay();
     try {
         const book = await fetchBook(bookId);
         state.currentBook = book;
         state.view = 'reader';
-        state.pageIndex = Math.max(0, Math.min((book.pages?.length || 1) - 1, (Number(pageNum) || 1) - 1));
+
+        const totalPages = Math.max(1, book.pages?.length || 1);
+        const prog = state.readingProgress?.[bookId];
+        let targetPageNum = Number(pageNum) || 1;
+        if (resumeProgress && pageNum === null) {
+            if (prog && Number.isFinite(Number(prog.pageIndex)) && prog.pageIndex > 0 && prog.pageIndex < totalPages - 1) {
+                targetPageNum = prog.pageIndex + 1;
+            } else {
+                targetPageNum = 1;
+            }
+        }
+        state.pageIndex = Math.max(0, Math.min(totalPages - 1, targetPageNum - 1));
+
         if (modeOverride) {
             state.mode = modeOverride;
         } else {
             const manifestItem = state.manifestBooks.find((b) => b.id === bookId);
-            state.mode = manifestItem?.defaultMode || 'storybook';
+            state.mode = (resumeProgress ? prog?.mode : '') || state.preferredMode || manifestItem?.defaultMode || 'storybook';
         }
+
+        saveCurrentProgress();
         renderCurrentView({ flashMagic });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -570,6 +682,7 @@ function goToPage(nextIndex) {
     if (nextIndex < 0 || nextIndex >= total || nextIndex === state.pageIndex) return;
     stopAllSpeechAndAutoplay();
     state.pageIndex = nextIndex;
+    saveCurrentProgress();
     renderCurrentView();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -591,6 +704,8 @@ function bindEvents() {
         if (state.mode !== 'storybook') {
             stopAllSpeechAndAutoplay();
             state.mode = 'storybook';
+            savePreferredMode('storybook');
+            saveCurrentProgress();
             renderCurrentView();
         }
     });
@@ -600,6 +715,8 @@ function bindEvents() {
         if (state.mode !== 'comic') {
             stopAllSpeechAndAutoplay();
             state.mode = 'comic';
+            savePreferredMode('comic');
+            saveCurrentProgress();
             renderCurrentView();
         }
     });
@@ -622,11 +739,31 @@ function bindEvents() {
         }
     });
 
+    btnSpeed?.addEventListener('click', () => {
+        audioEngine.unlockInGesture();
+        state.slowMode = !state.slowMode;
+        audioEngine.setPlaybackRate(state.slowMode ? 0.85 : 1.0);
+        try {
+            localStorage.setItem(STORAGE_SPEED_KEY, state.slowMode ? 'slow' : 'normal');
+        } catch (_) {}
+        syncChrome();
+    });
+
     btnToggleMute.addEventListener('click', () => {
         audioEngine.unlockInGesture();
         const nextMuted = !audioEngine.muted;
         if (nextMuted) stopAutoplay();
         audioEngine.setMuted(nextMuted);
+    });
+
+    btnRefreshApp?.addEventListener('click', () => {
+        stopAllSpeechAndAutoplay();
+        window.location.reload();
+    });
+
+    btnLightboxClose?.addEventListener('click', () => closeArtLightbox());
+    artLightboxEl?.addEventListener('click', (e) => {
+        if (e.target === artLightboxEl) closeArtLightbox();
     });
 
     btnOpenMailbox?.addEventListener('click', () => {
@@ -696,8 +833,12 @@ function bindEvents() {
         }
     }, { passive: true });
 
-    // 键盘左右键翻页
+    // 键盘左右键翻页 & Esc 关闭插画大图
     window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && artLightboxEl && !artLightboxEl.hidden) {
+            closeArtLightbox();
+            return;
+        }
         if (state.view !== 'reader') return;
         if (e.key === 'ArrowLeft') goToPage(state.pageIndex - 1);
         else if (e.key === 'ArrowRight') goToPage(state.pageIndex + 1);
@@ -735,6 +876,7 @@ const hotWatcher = new HotReloadWatcher({
                 ) {
                     const targetIdx = Math.max(0, Math.min((refreshed.pages?.length || 1) - 1, (Number(data.latestPage) || 1) - 1));
                     state.pageIndex = targetIdx;
+                    saveCurrentProgress();
                 }
             }
             renderCurrentView({ flashMagic: true });
@@ -785,7 +927,9 @@ window.__PEA_STORY_HOUSE__ = {
         hotReloadCount: state.hotReloadCount,
         version: hotWatcher.currentVersion,
         isSpeaking: audioEngine.isSpeaking,
-        patrolEnabled: Boolean(storyMailbox.patrol?.enabled)
+        patrolEnabled: Boolean(storyMailbox.patrol?.enabled),
+        slowMode: state.slowMode,
+        readingProgress: state.readingProgress
     }),
     checkVersionNow: () => hotWatcher.checkNow(),
     audioEngine,
