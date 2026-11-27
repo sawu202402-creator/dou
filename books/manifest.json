@@ -1,6 +1,18 @@
 {
   "books": [
     {
+      "id": "rainbow-sea-adventure",
+      "title": "小豌豆和彩虹的海上大冒险",
+      "emoji": "🌈",
+      "subtitle": "拉起七彩大帆，和小豌豆、好朋友彩虹一起去海上找海豚和七彩小鱼玩吧！",
+      "author": "小豌豆 & 魔法画师",
+      "cover": "books/rainbow-sea-adventure/images/cover.png",
+      "pageCount": 4,
+      "defaultMode": "storybook",
+      "tags": ["冒险", "大海", "好朋友"],
+      "updatedAt": "2026-11-27T17:58:00+05:30"
+    },
+    {
       "id": "moon-dessert-shop",
       "title": "小豌豆的月亮甜品店",
       "emoji": "🐰",
