@@ -63,7 +63,14 @@ function startLocalServer() {
     const ttsLog = [];
     const memWishes = [];
     const memReplies = [];
-    const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0 };
+    const patrolState = {
+        enabled: false,
+        updatedAt: 0,
+        updatedBy: '',
+        watcherLastSeenAt: Date.now(),
+        watcherOnline: true
+    };
+    const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0, patrolPostCalls: 0 };
     let liveVersionObj = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
 
     const srv = http.createServer((req, res) => {
@@ -171,8 +178,29 @@ function startLocalServer() {
                     res.end(JSON.stringify({ ok: true, wishes: memWishes, replies: memReplies }));
                     return;
                 }
+                if (urlPath === '/api/mailbox/patrol') {
+                    if (req.method === 'POST') {
+                        mailboxLog.patrolPostCalls += 1;
+                        patrolState.enabled = Boolean(body.enabled);
+                        patrolState.updatedAt = Date.now();
+                        patrolState.updatedBy = String(body.source || 'web');
+                        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                        res.end(JSON.stringify({ ok: true, patrol: patrolState, serverTime: Date.now() }));
+                        return;
+                    }
+                    const pendingWishes = memWishes.filter((w) => w.status === 'pending');
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        ok: true,
+                        patrol: patrolState,
+                        pendingCount: pendingWishes.length,
+                        pendingWishes,
+                        serverTime: Date.now()
+                    }));
+                    return;
+                }
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({ ok: true, wishes: memWishes, replies: memReplies }));
+                res.end(JSON.stringify({ ok: true, wishes: memWishes, replies: memReplies, patrol: patrolState }));
             });
             return;
         }
@@ -403,10 +431,29 @@ async function main() {
         await saveScreenshot(cdp, sessionId, '01-split-shelf.png');
         console.log('✓ [590x820] 书架渲染、封面图加载、零横向溢出');
 
+        // 验证顶部巡检开关默认关闭并可一键开启
+        const initialPressed = await evalJs(`document.getElementById('live-status').getAttribute('aria-pressed')`);
+        assert.equal(initialPressed, 'false', '巡检开关应默认关闭');
+        await evalJs(`document.getElementById('live-status').click()`);
+        await waitFor(`document.getElementById('live-status').getAttribute('aria-pressed') === 'true'`, 3000, 'patrol topbar toggle ON');
+        assert.ok(mailboxLog.patrolPostCalls >= 1, '点击顶部开关应请求 POST /api/mailbox/patrol');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '开启巡检后分屏书架存在横向溢出');
+
         // 测试站内「🪄 聊故事」魔法画师语音/文字对话与云端回信
         await evalJs(`document.getElementById('btn-shelf-open-mailbox').click()`);
         await waitFor(`document.getElementById('storyMailboxOverlay').hidden === false`, 3000, 'open mailbox modal');
         assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '分屏对话弹窗存在横向溢出');
+
+        // 验证弹窗内巡检开关与顶部同步，且可关闭回 OFF
+        const modalSwitchOn = await evalJs(`document.getElementById('smPatrolSwitch').getAttribute('aria-checked')`);
+        assert.equal(modalSwitchOn, 'true', '弹窗内巡检开关应与顶部同步开启');
+        await evalJs(`document.getElementById('smPatrolSwitch').click()`);
+        await waitFor(
+            `document.getElementById('smPatrolSwitch').getAttribute('aria-checked') === 'false' && document.getElementById('live-status').getAttribute('aria-pressed') === 'false'`,
+            3000,
+            'patrol modal toggle OFF sync'
+        );
+        console.log('✓ [590x820] 顶部与弹窗巡检开关联动（默认关 → 顶部开 → 弹窗关）通过');
 
         // 真实模拟麦克风录音 -> /api/mailbox/transcribe
         await evalJs(`document.getElementById('smMicBtn').click()`);

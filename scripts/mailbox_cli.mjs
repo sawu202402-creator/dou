@@ -9,6 +9,8 @@
  *      node scripts/mailbox_cli.mjs pull [--url https://...]
  *   3. 推送正式回信给小豌豆（网页端会自动角标提醒、真人语音播报，并支持一键跳到新书新页）：
  *      node scripts/mailbox_cli.mjs reply --to <wishId> --book <bookId> --page <pageNumber> --badge "🎉 新故事画好啦！" --text "回信内容..."
+ *   4. 查看或切换网页巡检开关：
+ *      node scripts/mailbox_cli.mjs patrol [status|on|off]
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -93,7 +95,13 @@ async function cmdPull(args) {
     const replies = Array.isArray(data.replies) ? data.replies : [];
 
     console.log(`\n🪄 云端魔法传声屋同步成功 (${baseUrl})`);
-    console.log(`   共收到小豌豆留言 ${wishes.length} 条 · 已发画师回信 ${replies.length} 封\n`);
+    console.log(`   共收到小豌豆留言 ${wishes.length} 条 · 已发画师回信 ${replies.length} 封`);
+    if (data.patrol && typeof data.patrol === 'object') {
+        const swLabel = data.patrol.enabled ? '开启' : '关闭';
+        const watcherLabel = data.patrol.watcherOnline ? '在线' : '未运行';
+        console.log(`   巡检开关: ${swLabel} · 电脑哨兵: ${watcherLabel}`);
+    }
+    console.log('');
 
     if (wishes.length === 0) {
         console.log('📭 目前还没有新的小豌豆留言哦！');
@@ -143,6 +151,40 @@ async function cmdReply(args) {
     console.log(`☁️ 已推送画师回信到云端传声屋 (${baseUrl}) [ID: ${entry.id}]！`);
 }
 
+async function cmdPatrol(args) {
+    const baseUrl = getBaseUrlOrExit(args);
+    const sub = String(args._[1] || 'status').toLowerCase();
+
+    if (sub === 'on' || sub === 'off') {
+        const enabled = sub === 'on';
+        const res = await fetch(`${baseUrl}/api/mailbox/patrol`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled, source: 'cli' })
+        });
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        }
+        const data = await res.json();
+        const swLabel = data.patrol?.enabled ? '开启' : '关闭';
+        const watcherLabel = data.patrol?.watcherOnline ? '在线' : '未运行';
+        console.log(`🎛️ 网页巡检开关已切换为【${swLabel}】 (${baseUrl})`);
+        console.log(`   电脑哨兵: ${watcherLabel}`);
+        return;
+    }
+
+    const res = await fetch(`${baseUrl}/api/mailbox/patrol`, {
+        headers: { Accept: 'application/json' }
+    });
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    }
+    const data = await res.json();
+    const swLabel = data.patrol?.enabled ? '开启' : '关闭';
+    const watcherLabel = data.patrol?.watcherOnline ? '在线' : '未运行';
+    console.log(`🎛️ 网页巡检开关: ${swLabel} · 电脑哨兵: ${watcherLabel} · 待处理留言: ${Number(data.pendingCount) || 0} 条 (${baseUrl})`);
+}
+
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     const cmd = args._[0] || 'pull';
@@ -169,7 +211,12 @@ async function main() {
         return;
     }
 
-    console.log('支持的命令: set-url | pull | reply');
+    if (cmd === 'patrol') {
+        await cmdPatrol(args);
+        return;
+    }
+
+    console.log('支持的命令: set-url | pull | reply | patrol [status|on|off]');
 }
 
 main().catch((err) => {

@@ -136,14 +136,19 @@
 ---
 
 ## 4. 云端魔法传声屋收发规范（小豌豆独立端内语音/文字对话）
-当小豌豆在 iPad 独立桌面版或全屏网页里直接点击顶部「🪄 聊故事」或书架提示卡，通过麦克风语音（Whisper 转文字）或打字向你提出新故事创意时：
-1. **拉取查看留言**：
+当小豌豆在 iPad 独立桌面版或全屏网页里直接点击顶部「🪄 聊故事」或书架提示卡，通过麦克风语音（Whisper 转文字）或打字向你提出新故事创意时，网页顶部与「🪄 聊故事」弹窗内配有**「画师巡检开关」**（默认关闭，家长/小朋友在网页上点击开启后才主动巡检）：
+1. **拉取查看留言与开关状态**：
    ```bash
    node scripts/mailbox_cli.mjs pull
+   node scripts/mailbox_cli.mjs patrol [status|on|off]
    ```
    （首次使用需绑定线上域名：`node scripts/mailbox_cli.mjs set-url https://<你的线上域名>`）
-2. **完成第 2 节全部 5 步创作与推送**：编写 `book.json`/`manifest.json`、生成无字插画、校验与 E2E 自检、更新 `version.json` 并推送 `origin/main`。
-3. **发送正式画师回信（带新书直达按钮与语音播报）**：
+2. **零 Token 本地哨兵联动（`scripts/watch_mailbox.mjs`）**：
+   - 平时挂起 `node scripts/watch_mailbox.mjs`（后台非守护进程模式 `IsDaemon: false`，不设 `NotificationTimeoutSeconds`），全程 **0 AI Token 消耗**；
+   - 当检测到网页端开启巡检开关且有 `pending` 留言时，哨兵会自动退出并唤醒你执行第 2 节全部 5 步创作流程；
+   - 完成创作、推送并发送正式回信后，自动重新启动 `node /home/better/IdeaProjects/dou/scripts/watch_mailbox.mjs` 回到零 Token 静默待命状态。
+3. **完成第 2 节全部 5 步创作与推送**：编写 `book.json`/`manifest.json`、生成无字插画、校验与 E2E 自检、更新 `version.json` 并推送 `origin/main`。
+4. **发送正式画师回信（带新书直达按钮与语音播报）**：
    ```bash
    node scripts/mailbox_cli.mjs reply --to <wishId> --book <bookId> --page <pageNumber> --badge "🎉 新故事画好啦！" --text "小豌豆！你要的……已经画好送到书架上啦，点下面按钮就能直接看！"
    ```
@@ -155,5 +160,7 @@
 - 书库与拼音校验：`npm run validate`（即 `node scripts/validate_books.mjs`）
 - 无头浏览器全量自检：`npm run test:e2e`（即 `node scripts/e2e_self_check.mjs`）
 - 拉取小豌豆云端留言：`npm run mailbox:pull`
+- 查看/切换网页巡检开关：`npm run mailbox:patrol`（或 `node scripts/mailbox_cli.mjs patrol on|off`）
+- 启动零 Token 本地哨兵：`npm run mailbox:watch`（即 `node scripts/watch_mailbox.mjs`）
 - 本地启动 Cloudflare Worker：`npx wrangler dev`
 - 部署到 Cloudflare Workers：`npx wrangler deploy`

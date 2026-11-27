@@ -261,8 +261,67 @@ export class StoryMailboxDO extends DurableObject {
                     created_at INTEGER NOT NULL,
                     created_str TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS mailbox_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
             `);
         });
+    }
+
+    _getSetting(key, defaultValue = "") {
+        const rows = this.ctx.storage.sql.exec(
+            `SELECT value, updated_at AS updatedAt FROM mailbox_settings WHERE key = ? LIMIT 1`,
+            key
+        ).toArray();
+        if (rows.length === 0) {
+            return { value: defaultValue, updatedAt: 0 };
+        }
+        return {
+            value: String(rows[0].value ?? defaultValue),
+            updatedAt: Number(rows[0].updatedAt) || 0
+        };
+    }
+
+    _setSetting(key, value, now = Date.now()) {
+        this.ctx.storage.sql.exec(
+            `INSERT INTO mailbox_settings (key, value, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at`,
+            key,
+            String(value),
+            now
+        );
+    }
+
+    _getPatrolState() {
+        const enabledRow = this._getSetting("patrol_enabled", "0");
+        const hbRow = this._getSetting("watcher_heartbeat_at", "0");
+        const byRow = this._getSetting("patrol_updated_by", "");
+        const watcherLastSeenAt = Number(hbRow.value) || 0;
+        const watcherOnline = watcherLastSeenAt > 0 && (Date.now() - watcherLastSeenAt) < 60_000;
+        return {
+            enabled: enabledRow.value === "1" || enabledRow.value === "true",
+            updatedAt: enabledRow.updatedAt || 0,
+            updatedBy: byRow.value || "",
+            watcherLastSeenAt,
+            watcherOnline
+        };
+    }
+
+    _readPendingWishes() {
+        return this.ctx.storage.sql.exec(
+            `SELECT id, kid_name AS kidName, book_id AS bookId, book_title AS bookTitle,
+                    page_number AS pageNumber, mode, text,
+                    created_at AS createdAt, created_str AS createdStr
+             FROM story_wishes
+             WHERE status = 'pending'
+             ORDER BY created_at ASC
+             LIMIT 20`
+        ).toArray();
     }
 
     _readAll() {
@@ -333,7 +392,42 @@ export class StoryMailboxDO extends DurableObject {
         try {
             if (request.method === "GET" && (path === "/api/mailbox" || path === "/api/mailbox/")) {
                 const { wishes, replies } = this._readAll();
-                return jsonResponse({ ok: true, wishes, replies, serverTime: Date.now() });
+                return jsonResponse({
+                    ok: true,
+                    wishes,
+                    replies,
+                    patrol: this._getPatrolState(),
+                    serverTime: Date.now()
+                });
+            }
+
+            if (request.method === "GET" && path === "/api/mailbox/patrol") {
+                if (url.searchParams.get("watcher") === "1") {
+                    this._setSetting("watcher_heartbeat_at", String(Date.now()));
+                }
+                const pendingWishes = this._readPendingWishes();
+                return jsonResponse({
+                    ok: true,
+                    patrol: this._getPatrolState(),
+                    pendingCount: pendingWishes.length,
+                    pendingWishes,
+                    serverTime: Date.now()
+                });
+            }
+
+            if (request.method === "POST" && path === "/api/mailbox/patrol") {
+                const body = await request.json().catch(() => ({}));
+                if (typeof body.enabled !== "boolean") {
+                    return jsonResponse({ ok: false, error: "invalid_enabled" }, 400);
+                }
+                const now = Date.now();
+                this._setSetting("patrol_enabled", body.enabled ? "1" : "0", now);
+                this._setSetting("patrol_updated_by", cleanStr(body.source, 24) || "web", now);
+                return jsonResponse({
+                    ok: true,
+                    patrol: this._getPatrolState(),
+                    serverTime: now
+                });
             }
 
             if (request.method === "POST" && path === "/api/mailbox/wish") {

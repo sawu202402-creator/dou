@@ -95,13 +95,15 @@ export class StoryMailboxController {
         getContext,
         onJumpToBook,
         onBeforeOpen,
-        onNewReply
+        onNewReply,
+        onPatrolChange
     } = {}) {
         this.audioEngine = audioEngine;
         this.getContext = typeof getContext === 'function' ? getContext : () => ({ view: 'shelf' });
         this.onJumpToBook = typeof onJumpToBook === 'function' ? onJumpToBook : () => {};
         this.onBeforeOpen = typeof onBeforeOpen === 'function' ? onBeforeOpen : () => {};
         this.onNewReply = typeof onNewReply === 'function' ? onNewReply : () => {};
+        this.onPatrolChange = typeof onPatrolChange === 'function' ? onPatrolChange : () => {};
 
         this.state = this._loadLocalState();
         this.cloudReplies = [];
@@ -109,6 +111,15 @@ export class StoryMailboxController {
         this._cloudUnavailable = false;
         this._syncTimer = null;
         this._knownReplyIds = new Set();
+
+        this.patrol = {
+            enabled: false,
+            updatedAt: 0,
+            updatedBy: '',
+            watcherLastSeenAt: 0,
+            watcherOnline: false
+        };
+        this._patrolBusy = false;
 
         this.isOpen = false;
         this.isRecording = false;
@@ -249,6 +260,19 @@ export class StoryMailboxController {
                     <button type="button" id="smCloseBtn" class="sm-close-btn" aria-label="关闭对话窗口">✕</button>
                 </header>
 
+                <div id="smPatrolBar" class="sm-patrol-bar is-off">
+                    <div class="sm-patrol-info">
+                        <span id="smPatrolDot" class="sm-patrol-dot" aria-hidden="true"></span>
+                        <div class="sm-patrol-texts">
+                            <div id="smPatrolTitle" class="sm-patrol-title">🌙 画师自动巡检：已关闭</div>
+                            <div id="smPatrolSub" class="sm-patrol-sub">平时不巡检省资源；准备画新书时点右边打开</div>
+                        </div>
+                    </div>
+                    <button type="button" id="smPatrolSwitch" class="sm-switch" role="switch" aria-checked="false" aria-label="开启或关闭画师自动巡检">
+                        <span class="sm-switch-thumb"></span>
+                    </button>
+                </div>
+
                 <div id="smStream" class="sm-stream" aria-live="polite"></div>
 
                 <footer class="sm-composer">
@@ -287,6 +311,10 @@ export class StoryMailboxController {
             overlay,
             closeBtn: overlay.querySelector('#smCloseBtn'),
             contextPill: overlay.querySelector('#smContextPill'),
+            patrolBar: overlay.querySelector('#smPatrolBar'),
+            patrolTitle: overlay.querySelector('#smPatrolTitle'),
+            patrolSub: overlay.querySelector('#smPatrolSub'),
+            patrolSwitch: overlay.querySelector('#smPatrolSwitch'),
             stream: overlay.querySelector('#smStream'),
             chipsRow: overlay.querySelector('#smChipsRow'),
             recBanner: overlay.querySelector('#smRecBanner'),
@@ -303,6 +331,11 @@ export class StoryMailboxController {
         this.dom.closeBtn.addEventListener('click', () => this.close());
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) this.close();
+        });
+
+        this.dom.patrolSwitch?.addEventListener('click', () => {
+            this.audioEngine?.unlockInGesture?.();
+            this.togglePatrol();
         });
 
         this.dom.micBtn.addEventListener('click', () => {
@@ -352,6 +385,94 @@ export class StoryMailboxController {
         });
 
         this._renderChips();
+        this._renderPatrolBar();
+    }
+
+    _applyPatrolState(rawPatrol) {
+        if (!rawPatrol || typeof rawPatrol !== 'object') return;
+        this.patrol = {
+            enabled: Boolean(rawPatrol.enabled),
+            updatedAt: Number(rawPatrol.updatedAt) || 0,
+            updatedBy: String(rawPatrol.updatedBy || ''),
+            watcherLastSeenAt: Number(rawPatrol.watcherLastSeenAt) || 0,
+            watcherOnline: Boolean(rawPatrol.watcherOnline)
+        };
+        this._renderPatrolBar();
+        this.onPatrolChange(this.patrol);
+    }
+
+    _renderPatrolBar() {
+        const bar = this.dom.patrolBar;
+        const titleEl = this.dom.patrolTitle;
+        const subEl = this.dom.patrolSub;
+        const swEl = this.dom.patrolSwitch;
+        if (!bar || !titleEl || !subEl || !swEl) return;
+
+        const enabled = Boolean(this.patrol.enabled);
+        const watcherOnline = Boolean(this.patrol.watcherOnline);
+
+        bar.classList.toggle('is-on', enabled);
+        bar.classList.toggle('is-off', !enabled);
+        bar.classList.toggle('is-watcher-offline', enabled && !watcherOnline);
+
+        swEl.setAttribute('aria-checked', String(enabled));
+        swEl.disabled = this._patrolBusy;
+
+        if (enabled) {
+            titleEl.textContent = '✨ 画师自动巡检：已开启';
+            subEl.textContent = watcherOnline
+                ? '电脑画师正在值守，发完故事点子会自动动笔画书！'
+                : '开关已打开，等待电脑端零能耗哨兵上线接收留言…';
+        } else {
+            titleEl.textContent = '🌙 画师自动巡检：已关闭';
+            subEl.textContent = watcherOnline
+                ? '平时不巡检；准备画新书时打开开关即可 · 电脑哨兵待命中'
+                : '平时不巡检；准备画新书时打开开关即可';
+        }
+    }
+
+    async setPatrolEnabled(enabled) {
+        if (this._patrolBusy) return null;
+        if (!this._shouldUseCloudApi()) return null;
+
+        this._patrolBusy = true;
+        this._renderPatrolBar();
+        this.onPatrolChange(this.patrol);
+
+        try {
+            const res = await fetch('/api/mailbox/patrol', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: Boolean(enabled), source: 'web' })
+            });
+            const data = res.ok ? await res.json().catch(() => null) : null;
+            if (res.ok && data?.ok && data.patrol) {
+                this._applyPatrolState(data.patrol);
+                if (this.isOpen && this.dom.statusHint) {
+                    this.dom.statusHint.textContent = data.patrol.enabled
+                        ? '✨ 已开启画师自动巡检！发完点子画师就会立刻收到哦～'
+                        : '🌙 已关闭画师自动巡检，平时零消耗静静休息中～';
+                }
+                return data.patrol;
+            }
+            if (this.isOpen && this.dom.statusHint) {
+                this.dom.statusHint.textContent = '⚠️ 切换巡检开关暂时没成功，请稍后再试一次哦～';
+            }
+            return null;
+        } catch (_) {
+            if (this.isOpen && this.dom.statusHint) {
+                this.dom.statusHint.textContent = '⚠️ 网络开小差啦，巡检开关还没切换成功哦～';
+            }
+            return null;
+        } finally {
+            this._patrolBusy = false;
+            this._renderPatrolBar();
+            this.onPatrolChange(this.patrol);
+        }
+    }
+
+    async togglePatrol() {
+        return this.setPatrolEnabled(!this.patrol.enabled);
     }
 
     _renderChips() {
@@ -429,6 +550,7 @@ export class StoryMailboxController {
         this.isOpen = true;
         this._updateContextPill();
         this._renderChips();
+        this._renderPatrolBar();
         this.dom.overlay.hidden = false;
 
         const unread = this.getUnreadReplies();
@@ -1024,6 +1146,9 @@ export class StoryMailboxController {
             }
 
             this.cloudOnline = true;
+            if (data.patrol && typeof data.patrol === 'object') {
+                this._applyPatrolState(data.patrol);
+            }
             const cloudWishes = Array.isArray(data.wishes) ? data.wishes : [];
             const cloudReplies = Array.isArray(data.replies) ? data.replies : [];
 

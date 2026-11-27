@@ -91,6 +91,116 @@
     flex-shrink: 0;
 }
 
+/* ==================== 画师巡检开关栏 ==================== */
+.sm-patrol-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 16px;
+    border-bottom: 1.5px solid #EBD7C0;
+    background: #FAF4EA;
+    transition: background 0.2s ease;
+}
+
+.sm-patrol-bar.is-off {
+    background: #FAF4EA;
+}
+
+.sm-patrol-bar.is-on {
+    background: #E9FBF7;
+}
+
+.sm-patrol-bar.is-on.is-watcher-offline {
+    background: #FFF8E4;
+}
+
+.sm-patrol-info {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.sm-patrol-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #B8A492;
+    flex-shrink: 0;
+}
+
+.sm-patrol-bar.is-on .sm-patrol-dot {
+    background: #20C997;
+    box-shadow: 0 0 0 3px rgba(32, 201, 151, 0.22);
+}
+
+.sm-patrol-bar.is-on.is-watcher-offline .sm-patrol-dot {
+    background: #E6A225;
+    box-shadow: 0 0 0 3px rgba(230, 162, 37, 0.22);
+}
+
+.sm-patrol-texts {
+    min-width: 0;
+}
+
+.sm-patrol-title {
+    font-size: 0.85rem;
+    font-weight: 900;
+    color: var(--ink-brown);
+}
+
+.sm-patrol-sub {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    line-height: 1.35;
+}
+
+.sm-switch {
+    position: relative;
+    width: 48px;
+    height: 28px;
+    padding: 3px;
+    border-radius: 999px;
+    background: #D4C4B0;
+    box-shadow: inset 0 0 0 1.5px #BFAD96;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sm-switch[aria-checked="true"] {
+    background: #20C997;
+    box-shadow: inset 0 0 0 1.5px #16A57B;
+}
+
+.sm-patrol-bar.is-on.is-watcher-offline .sm-switch[aria-checked="true"] {
+    background: #E6A225;
+    box-shadow: inset 0 0 0 1.5px #C78712;
+}
+
+.sm-switch:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.sm-switch-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 1px 4px rgba(58, 43, 36, 0.25);
+    transition: transform 0.2s ease;
+}
+
+.sm-switch[aria-checked="true"] .sm-switch-thumb {
+    transform: translateX(20px);
+}
+
 .sm-stream {
     flex: 1 1 auto;
     overflow-y: auto;

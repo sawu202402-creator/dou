@@ -60,6 +60,7 @@ const state = {
     latestVersionInfo: null,
     updatedBookId: '',
     hotReloadCount: 0,
+    hotConnected: true,
     bannerMode: 'version',
     bannerReplyText: ''
 };
@@ -96,8 +97,42 @@ const storyMailbox = new StoryMailboxController({
             hotBannerMsgEl.textContent = `🪄 魔法故事画师给你回信啦：${(reply.text || '').slice(0, 32)}…`;
             hotBannerEl.hidden = false;
         }
-    }
+    },
+    onPatrolChange: () => syncPatrolBadge()
 });
+
+function syncPatrolBadge() {
+    if (!liveStatusEl || !liveTextEl) return;
+    const connected = state.hotConnected;
+    liveStatusEl.classList.toggle('is-offline', !connected);
+    if (!connected) {
+        liveStatusEl.classList.remove('is-patrol-on', 'is-patrol-off', 'is-watcher-offline', 'is-busy');
+        liveTextEl.textContent = '重新连线中';
+        liveStatusEl.title = '网页连线暂时断开，正在自动重连…';
+        return;
+    }
+
+    const enabled = Boolean(storyMailbox.patrol?.enabled);
+    const watcherOnline = Boolean(storyMailbox.patrol?.watcherOnline);
+    const busy = Boolean(storyMailbox._patrolBusy);
+
+    liveStatusEl.setAttribute('aria-pressed', String(enabled));
+    liveStatusEl.classList.toggle('is-patrol-on', enabled);
+    liveStatusEl.classList.toggle('is-patrol-off', !enabled);
+    liveStatusEl.classList.toggle('is-watcher-offline', enabled && !watcherOnline);
+    liveStatusEl.classList.toggle('is-busy', busy);
+    liveTextEl.textContent = enabled ? '巡检：开' : '巡检：关';
+
+    if (enabled) {
+        liveStatusEl.title = watcherOnline
+            ? '画师自动巡检已开启（电脑哨兵在线值守），点击可关闭'
+            : '画师自动巡检已开启（等待电脑端哨兵上线），点击可关闭';
+    } else {
+        liveStatusEl.title = watcherOnline
+            ? '画师自动巡检已关闭（平时零消耗，电脑哨兵待命中），点击开启'
+            : '画师自动巡检已关闭（平时零消耗），点击开启';
+    }
+}
 
 function setSpeakingHighlight(key) {
     state.speakingKey = key || '';
@@ -599,6 +634,11 @@ function bindEvents() {
         storyMailbox.open();
     });
 
+    liveStatusEl?.addEventListener('click', () => {
+        audioEngine.unlockInGesture();
+        storyMailbox.togglePatrol();
+    });
+
     btnPrevPage.addEventListener('click', () => {
         audioEngine.unlockInGesture();
         goToPage(state.pageIndex - 1);
@@ -667,9 +707,8 @@ function bindEvents() {
 const hotWatcher = new HotReloadWatcher({
     intervalMs: 3000,
     onStatusChange: ({ connected }) => {
-        if (!liveStatusEl || !liveTextEl) return;
-        liveStatusEl.classList.toggle('is-offline', !connected);
-        liveTextEl.textContent = connected ? '魔法连线中' : '重新连线中';
+        state.hotConnected = connected;
+        syncPatrolBadge();
     },
     onInit: (data) => {
         state.latestVersionInfo = data;
@@ -714,6 +753,7 @@ const hotWatcher = new HotReloadWatcher({
 
 async function bootstrap() {
     bindEvents();
+    syncPatrolBadge();
     storyMailbox.bindBadgeEl(mailboxUnreadBadge);
     storyMailbox.init();
     try {
@@ -744,7 +784,8 @@ window.__PEA_STORY_HOUSE__ = {
         autoplaying: state.autoplaying,
         hotReloadCount: state.hotReloadCount,
         version: hotWatcher.currentVersion,
-        isSpeaking: audioEngine.isSpeaking
+        isSpeaking: audioEngine.isSpeaking,
+        patrolEnabled: Boolean(storyMailbox.patrol?.enabled)
     }),
     checkVersionNow: () => hotWatcher.checkNow(),
     audioEngine,

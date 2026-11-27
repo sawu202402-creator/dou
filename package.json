@@ -8,6 +8,8 @@
     "validate": "node scripts/validate_books.mjs",
     "test:e2e": "node scripts/e2e_self_check.mjs",
     "mailbox:pull": "node scripts/mailbox_cli.mjs pull",
+    "mailbox:patrol": "node scripts/mailbox_cli.mjs patrol",
+    "mailbox:watch": "node scripts/watch_mailbox.mjs",
     "dev": "npx wrangler dev",
     "deploy": "npx wrangler deploy"
   }
