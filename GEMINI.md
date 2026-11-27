@@ -44,8 +44,9 @@
 2. **禁止画中带文字**：
    - 所有生图提示词**必须**明确包含：`no text, no words, no Chinese characters, no speech bubbles, no watermarks`。
    - 所有中文故事、气泡台词、拟声词贴纸和拼音全部由前端高清排版叠加，绝不让 AI 生图画乱码汉字。
-3. **落盘仓库**：
-   - 将 `image-generator` 生成的图片复制到 `books/<book-id>/images/` 目录下（如 `cover.png`、`p01-1.png`、`p01-2.png`、`p01-3.png`），确认与 `book.json` 和 `manifest.json` 路径一致且文件非空。
+3. **落盘仓库（高清 WebP 极速规范）**：
+   - 将 `image-generator` 生成的图片使用 Python Pillow（`WEBP`, `quality=84`, `method=6`）转为高清 `.webp` 存入 `books/<book-id>/images/` 目录下（如 `cover.webp`、`p01-1.webp`、`p01-2.webp`、`p01-3.webp`）：封面等比缩放至宽 ≤ `720px`，宽幅大图宽 ≤ `1120px`，方形分镜图 ≤ `800px`，禁止存放兆级无压缩 PNG。
+   - 确认落盘文件路径与 `book.json`、`manifest.json` 严格一致且非空。
 
 ### 第 3 步：执行数据校验与无头浏览器零报错自检
 1. 运行数据与拼音对齐校验脚本：

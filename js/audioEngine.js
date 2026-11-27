@@ -279,10 +279,10 @@ export class StoryAudioEngine {
     }
 
     prefetch(text, role = 'narrator') {
-        if (this.muted || !text || !this._shouldUseCloudTts()) return;
+        if (this.muted || !text || !this._shouldUseCloudTts()) return Promise.resolve('');
         const cleanText = cleanTextForTts(text);
-        if (!cleanText) return;
-        this._fetchNeuralTtsBase64(cleanText, role).catch(() => {});
+        if (!cleanText) return Promise.resolve('');
+        return this._fetchNeuralTtsBase64(cleanText, role).catch(() => '');
     }
 
     async _playBase64AndAwaitEnd(b64, token) {

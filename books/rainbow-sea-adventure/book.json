@@ -5,7 +5,7 @@
   "emoji": "🌈",
   "subtitle": "拉起七彩大帆，和小豌豆、好朋友彩虹一起去海上找海豚和七彩小鱼玩吧！",
   "author": "小豌豆 & 魔法画师",
-  "cover": "books/rainbow-sea-adventure/images/cover.png",
+  "cover": "books/rainbow-sea-adventure/images/cover.webp",
   "artStyleBible": "Warm whimsical children's picture book watercolor and gouache illustration, soft warm-brown storybook ink outlines, sunlit turquoise ocean, sky blue, coral pink, sunny buttercup gold, and pastel rainbow palette, sparkling sea spray and warm sunlit reflections, Studio Ghibli / European picture book charm, strictly no text/words/letters/bubbles/watermarks. Characters: Xiao Wandou (7yo Chinese girl with two buns tied with pink ribbons, cream plush bunny-ear hairband, pastel pink-and-white nautical sailor dress with tiny green pea collar badge); Caihong (7yo Chinese girl best friend with braided twin pigtails, colorful pastel rainbow hair clips, pastel rainbow-striped sundress, yellow sandals); Bubble Dolphin (adorable baby sky-blue dolphin blowing pastel rainbow bubbles); Rainbow Fish (cute plump tropical ocean fish with shimmering pastel rainbow scales and tiny white pearl crown).",
   "characters": {
     "narrator": {
@@ -54,7 +54,7 @@
       "pageNumber": 1,
       "title": "彩虹帆船出海啦",
       "titlePinyin": "cǎi hóng fān chuán chū hǎi la",
-      "illustration": "books/rainbow-sea-adventure/images/p01-1.png",
+      "illustration": "books/rainbow-sea-adventure/images/p01-1.webp",
       "storyParagraphs": [
         {
           "text": "清晨的海风暖暖地吹过，小豌豆和好朋友彩虹拉起七彩大帆，驾着奶油木头帆船向蓝蓝的大海出发啦！",
@@ -68,7 +68,7 @@
       "comicLayout": "hero-top",
       "panels": [
         {
-          "image": "books/rainbow-sea-adventure/images/p01-1.png",
+          "image": "books/rainbow-sea-adventure/images/p01-1.webp",
           "caption": "小豌豆和好朋友彩虹乘着彩虹帆船驶向阳光灿烂的大海。",
           "captionPinyin": "xiǎo wān dòu hé hǎo péng you cǎi hóng chéng zhe cǎi hóng fān chuán shǐ xiàng yáng guāng càn làn de dà hǎi",
           "stickers": [
@@ -84,7 +84,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p01-2.png",
+          "image": "books/rainbow-sea-adventure/images/p01-2.webp",
           "caption": "彩虹拿出贝壳望远镜，发现前面水花直跳。",
           "captionPinyin": "cǎi hóng ná chū bèi ké wàng yuǎn jìng fā xiàn qián miàn shuǐ huā zhí tiào",
           "stickers": [
@@ -100,7 +100,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p01-3.png",
+          "image": "books/rainbow-sea-adventure/images/p01-3.webp",
           "caption": "小海豚高高跃出水面，开心地拍拍胸鳍。",
           "captionPinyin": "xiǎo hǎi tún gāo gāo yuè chū shuǐ miàn kāi xīn de pāi pai xiōng qí",
           "stickers": [
@@ -127,7 +127,7 @@
       "pageNumber": 2,
       "title": "跟着海豚冲浪玩",
       "titlePinyin": "gēn zhe hǎi tún chōng làng wán",
-      "illustration": "books/rainbow-sea-adventure/images/p02-3.png",
+      "illustration": "books/rainbow-sea-adventure/images/p02-3.webp",
       "storyParagraphs": [
         {
           "text": "泡泡海豚露出圆圆的小脑袋，咕嘟咕嘟吹出一串亮晶晶的彩虹泡泡，飘得满船都是。",
@@ -141,7 +141,7 @@
       "comicLayout": "hero-bottom",
       "panels": [
         {
-          "image": "books/rainbow-sea-adventure/images/p02-1.png",
+          "image": "books/rainbow-sea-adventure/images/p02-1.webp",
           "caption": "泡泡海豚鼓起腮帮，吹出圆溜溜的彩色大泡泡。",
           "captionPinyin": "pào pào hǎi tún gǔ qǐ sāi bāng chuī chū yuán liū liū de cǎi sè dà pào pào",
           "stickers": [
@@ -157,7 +157,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p02-2.png",
+          "image": "books/rainbow-sea-adventure/images/p02-2.webp",
           "caption": "小豌豆和彩虹围着漫天泡泡咯咯笑个不停。",
           "captionPinyin": "xiǎo wān dòu hé cǎi hóng wéi zhe màn tiān pào pào gē gē xiào ge bù tíng",
           "stickers": [
@@ -173,7 +173,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p02-3.png",
+          "image": "books/rainbow-sea-adventure/images/p02-3.webp",
           "caption": "小帆船跟着海豚顺着大海浪冲下去啦！",
           "captionPinyin": "xiǎo fān chuán gēn zhe hǎi tún shùn zhe dà hǎi làng chōng xià qù la",
           "stickers": [
@@ -200,7 +200,7 @@
       "pageNumber": 3,
       "title": "遇见七彩小鱼群",
       "titlePinyin": "yù jiàn qī cǎi xiǎo yú qún",
-      "illustration": "books/rainbow-sea-adventure/images/p03-1.png",
+      "illustration": "books/rainbow-sea-adventure/images/p03-1.webp",
       "storyParagraphs": [
         {
           "text": "帆船来到清澈见底的珊瑚湾，小豌豆和彩虹趴在船边往下望，一群披着七彩鳞片的小鱼正绕着海船跳水舞。",
@@ -214,7 +214,7 @@
       "comicLayout": "hero-top",
       "panels": [
         {
-          "image": "books/rainbow-sea-adventure/images/p03-1.png",
+          "image": "books/rainbow-sea-adventure/images/p03-1.webp",
           "caption": "透明的珊瑚湾里，七彩小鱼们排成弯弯的彩虹队形。",
           "captionPinyin": "tòu míng de shān hú wān lǐ qī cǎi xiǎo yú men pái chéng wān wān de cǎi hóng duì xíng",
           "stickers": [
@@ -230,7 +230,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p03-2.png",
+          "image": "books/rainbow-sea-adventure/images/p03-2.webp",
           "caption": "戴珍珠皇冠的小鱼队长捧着粉海螺浮上水面。",
           "captionPinyin": "dài zhēn zhū huáng guān de xiǎo yú duì zhǎng pěng zhe fěn hǎi luó fú shàng shuǐ miàn",
           "stickers": [
@@ -246,7 +246,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p03-3.png",
+          "image": "books/rainbow-sea-adventure/images/p03-3.webp",
           "caption": "小豌豆和彩虹凑在一起倾听海螺里的歌声。",
           "captionPinyin": "xiǎo wān dòu hé cǎi hóng còu zài yì qǐ qīng tīng hǎi luó lǐ de gē shēng",
           "stickers": [
@@ -273,7 +273,7 @@
       "pageNumber": 4,
       "title": "海面上的彩虹野餐",
       "titlePinyin": "hǎi miàn shàng de cǎi hóng yě cān",
-      "illustration": "books/rainbow-sea-adventure/images/p04-3.png",
+      "illustration": "books/rainbow-sea-adventure/images/p04-3.webp",
       "storyParagraphs": [
         {
           "text": "夕阳把海面染成金粉色，小豌豆和彩虹在甲板上铺开格子野餐布，摆出冰甜的大西瓜、草莓果汁和海星小饼干。",
@@ -287,7 +287,7 @@
       "comicLayout": "hero-bottom",
       "panels": [
         {
-          "image": "books/rainbow-sea-adventure/images/p04-1.png",
+          "image": "books/rainbow-sea-adventure/images/p04-1.webp",
           "caption": "金色的阳光洒在甲板上，海上野餐准备好了。",
           "captionPinyin": "jīn sè de yáng guāng sǎ zài jiǎ bǎn shàng hǎi shàng yě cān zhǔn bèi hǎo le",
           "stickers": [
@@ -303,7 +303,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p04-2.png",
+          "image": "books/rainbow-sea-adventure/images/p04-2.webp",
           "caption": "泡泡海豚和七彩小鱼探出脑袋来道别。",
           "captionPinyin": "pào pào hǎi tún hé qī cǎi xiǎo yú tàn chū nǎo dai lái dào bié",
           "stickers": [
@@ -319,7 +319,7 @@
           ]
         },
         {
-          "image": "books/rainbow-sea-adventure/images/p04-3.png",
+          "image": "books/rainbow-sea-adventure/images/p04-3.webp",
           "caption": "天边架起大彩虹，最快乐的海上冒险画上圆满句号！",
           "captionPinyin": "tiān biān jià qǐ dà cǎi hóng zuì kuài lè de hǎi shàng mào xiǎn huà shàng yuán mǎn jù hào",
           "stickers": [

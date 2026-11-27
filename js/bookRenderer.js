@@ -29,7 +29,7 @@ export function renderBookshelf(container, books, { latestBookId = '', updatedJu
             <article class="book-card ${isFresh ? 'is-fresh' : ''}" data-book-id="${escapeHtml(book.id)}" tabindex="0" role="button" aria-label="打开《${escapeHtml(book.title)}》">
                 ${isFresh ? '<div class="fresh-ribbon">✨ 刚刚上新</div>' : ''}
                 <div class="book-cover-wrap">
-                    <img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)}" class="book-cover-img" loading="eager">
+                    <img src="${escapeHtml(book.cover)}" alt="${escapeHtml(book.title)}" class="book-cover-img" loading="eager" decoding="async" fetchpriority="high">
                     <div class="book-spine-shine"></div>
                 </div>
                 <div class="book-card-body">
@@ -119,7 +119,7 @@ export function renderStorybookPage(container, book, page, {
             <div class="storybook-left-page">
                 <button type="button" class="storybook-art-btn" id="btn-storybook-art" aria-label="点击插画听本页故事">
                     <span class="storybook-page-ribbon">第 ${pageIndex + 1} / ${totalPages} 页</span>
-                    <img src="${escapeHtml(page.illustration)}" alt="${escapeHtml(page.title)}" class="storybook-illustration">
+                    <img src="${escapeHtml(page.illustration)}" alt="${escapeHtml(page.title)}" class="storybook-illustration" loading="eager" decoding="async" fetchpriority="high">
                     <span class="art-tap-hint">🔊 点图画听本页</span>
                 </button>
             </div>
@@ -248,7 +248,7 @@ export function renderComicPage(container, book, page, {
             <div class="comic-panel panel-idx-${pIdx}" data-panel-idx="${pIdx}">
                 ${captionHtml}
                 <div class="comic-art-box">
-                    <img src="${escapeHtml(panel.image)}" alt="${escapeHtml(panel.caption || page.title)}" class="comic-panel-img">
+                    <img src="${escapeHtml(panel.image)}" alt="${escapeHtml(panel.caption || page.title)}" class="comic-panel-img" decoding="async"${pIdx === 0 ? ' fetchpriority="high"' : ''}>
                     ${stickersHtml}
                     <span class="panel-number-tag">${pIdx + 1}</span>
                 </div>

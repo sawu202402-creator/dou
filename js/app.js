@@ -204,25 +204,119 @@ async function fetchBook(bookId, forceRefresh = false) {
     return book;
 }
 
+const preloadedImageUrls = new Set();
+const inflightPreloadImages = new Set();
+let shelfWarmupTimer = null;
+let ttsPrefetchTimer = null;
+let ttsPrefetchRunId = 0;
+
+function preloadImages(urls = []) {
+    for (const rawUrl of urls) {
+        const url = String(rawUrl || '').trim();
+        if (!url || preloadedImageUrls.has(url)) continue;
+        preloadedImageUrls.add(url);
+        const img = new Image();
+        img.decoding = 'async';
+        inflightPreloadImages.add(img);
+        const release = () => inflightPreloadImages.delete(img);
+        img.onload = release;
+        img.onerror = release;
+        img.src = url;
+    }
+}
+
+function collectPageImageUrls(page, { includeComic = true, includeIllustration = true } = {}) {
+    if (!page) return [];
+    const urls = [];
+    if (includeIllustration && page.illustration) urls.push(page.illustration);
+    if (includeComic && Array.isArray(page.panels)) {
+        for (const panel of page.panels) {
+            if (panel?.image) urls.push(panel.image);
+        }
+    }
+    return urls;
+}
+
+function preloadNeighborPages(book, pageIndex) {
+    const pages = book?.pages || [];
+    if (!pages.length) return;
+    const urls = [];
+    const cur = pages[pageIndex];
+    if (cur) {
+        if (state.mode === 'storybook') {
+            urls.push(...collectPageImageUrls(cur, { includeComic: true, includeIllustration: false }));
+        } else {
+            urls.push(...collectPageImageUrls(cur, { includeComic: false, includeIllustration: true }));
+        }
+    }
+    const next = pages[pageIndex + 1];
+    if (next) {
+        urls.push(...collectPageImageUrls(next, { includeComic: true, includeIllustration: true }));
+    }
+    const prev = pages[pageIndex - 1];
+    if (prev) {
+        urls.push(...collectPageImageUrls(prev, { includeComic: false, includeIllustration: true }));
+    }
+    preloadImages(urls);
+}
+
+function warmShelfBooksInBackground() {
+    if (shelfWarmupTimer) {
+        clearTimeout(shelfWarmupTimer);
+        shelfWarmupTimer = null;
+    }
+    shelfWarmupTimer = setTimeout(async () => {
+        if (state.view !== 'shelf') return;
+        const targets = (state.manifestBooks || []).slice(0, 3);
+        for (let i = 0; i < targets.length; i++) {
+            if (state.view !== 'shelf') break;
+            const b = await fetchBook(targets[i].id).catch(() => null);
+            if (b && i < 2 && b.pages?.[0]?.illustration) {
+                preloadImages([b.pages[0].illustration]);
+            }
+        }
+    }, 300);
+}
+
 function prefetchCurrentPage() {
+    if (ttsPrefetchTimer) {
+        clearTimeout(ttsPrefetchTimer);
+        ttsPrefetchTimer = null;
+    }
+    const myRunId = ++ttsPrefetchRunId;
     const book = state.currentBook;
     const page = book?.pages?.[state.pageIndex];
     if (!book || !page || audioEngine.muted) return;
 
+    const queue = [];
     if (state.mode === 'storybook') {
-        const paras = page.storyParagraphs || [];
-        if (paras[0]) audioEngine.prefetch(paras[0].text, 'narrator');
-        if (paras[1]) audioEngine.prefetch(paras[1].text, 'narrator');
+        for (const p of (page.storyParagraphs || []).slice(0, 2)) {
+            if (p?.text) queue.push({ text: p.text, role: 'narrator' });
+        }
     } else {
         const characters = book.characters || {};
-        (page.panels || []).forEach((panel) => {
-            if (panel.caption) audioEngine.prefetch(panel.caption, 'narrator');
-            (panel.bubbles || []).forEach((b) => {
+        for (const panel of (page.panels || [])) {
+            if (panel.caption && queue.length < 3) {
+                queue.push({ text: panel.caption, role: 'narrator' });
+            }
+            for (const b of (panel.bubbles || [])) {
+                if (queue.length >= 3) break;
                 const role = characters[b.characterId]?.voiceRole || 'narrator';
-                audioEngine.prefetch(b.text, role);
-            });
-        });
+                if (b?.text) queue.push({ text: b.text, role });
+            }
+            if (queue.length >= 3) break;
+        }
     }
+
+    if (queue.length === 0) return;
+
+    // 错峰延迟 500ms 再串行预热前几句语音，确保当前页图片优先加载不抢带宽
+    ttsPrefetchTimer = setTimeout(async () => {
+        for (const item of queue) {
+            if (myRunId !== ttsPrefetchRunId || audioEngine.muted) break;
+            await audioEngine.prefetch(item.text, item.role);
+        }
+    }, 500);
 }
 
 async function speakSingle(text, role, speakKey) {
@@ -367,6 +461,7 @@ function renderCurrentView({ flashMagic = false } = {}) {
                 storyMailbox.open();
             }
         });
+        warmShelfBooksInBackground();
         return;
     }
 
@@ -403,6 +498,7 @@ function renderCurrentView({ flashMagic = false } = {}) {
         if (panel) panel.classList.add('page-magic-flash');
     }
 
+    preloadNeighborPages(book, state.pageIndex);
     prefetchCurrentPage();
 }
 

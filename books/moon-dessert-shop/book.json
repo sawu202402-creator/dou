@@ -5,7 +5,7 @@
   "emoji": "🐰",
   "subtitle": "坐上棉花糖热气球，去弯弯的月亮上开一家会发光的甜品店吧！",
   "author": "小豌豆 & 魔法画师",
-  "cover": "books/moon-dessert-shop/images/cover.png",
+  "cover": "books/moon-dessert-shop/images/cover.webp",
   "artStyleBible": "Warm whimsical children's picture book watercolor and gouache illustration, soft warm-brown storybook ink outlines, dreamy pastel cream, moonlit lavender-blue, buttercup gold, and strawberry pink palette, cozy glowing starlight, Studio Ghibli / European picture book charm, strictly no text/words/bubbles/watermarks. Characters: Xiao Wandou (7yo Chinese girl with two neat hair buns tied with pink ribbons, cream bunny-ear headband, lavender puff-sleeve dress, pastel pink baker apron with tiny green pea pocket badge); Mochi Bunny (plump tiny white lop-eared rabbit with miniature golden baker hat and mint neckerchief, sugar sparkles on ears); Cloud Bear (fluffy white little polar bear with pastel rainbow knitted scarf); Candy Star (cute chibi golden star sprite with tiny sky-blue boots and miniature galaxy satchel).",
   "characters": {
     "narrator": {
@@ -54,7 +54,7 @@
       "pageNumber": 1,
       "title": "棉花糖热气球起飞啦",
       "titlePinyin": "mián hua táng rè qì qiú qǐ fēi la",
-      "illustration": "books/moon-dessert-shop/images/p01-1.png",
+      "illustration": "books/moon-dessert-shop/images/p01-1.webp",
       "storyParagraphs": [
         {
           "text": "夜晚的微风轻轻吹过，小豌豆坐着粉白相间的棉花糖热气球，哼着歌飞上了亮晶晶的星空。",
@@ -68,7 +68,7 @@
       "comicLayout": "hero-top",
       "panels": [
         {
-          "image": "books/moon-dessert-shop/images/p01-1.png",
+          "image": "books/moon-dessert-shop/images/p01-1.webp",
           "caption": "软绵绵的棉花糖热气球，载着小豌豆往弯弯的月亮飞去。",
           "captionPinyin": "ruǎn mián mián de mián hua táng rè qì qiú zài zhe xiǎo wān dòu wǎng wān wān de yuè liang fēi qù",
           "stickers": [
@@ -84,7 +84,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p01-2.png",
+          "image": "books/moon-dessert-shop/images/p01-2.webp",
           "caption": "小豌豆拉起彩虹布篷，亮起暖暖的小灯串。",
           "captionPinyin": "xiǎo wān dòu lā qǐ cǎi hóng bù péng liàng qǐ nuǎn nuǎn de xiǎo dēng chuàn",
           "stickers": [
@@ -100,7 +100,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p01-3.png",
+          "image": "books/moon-dessert-shop/images/p01-3.webp",
           "caption": "一只软乎乎的麻薯兔拿着打蛋器蹦了出来！",
           "captionPinyin": "yì zhī ruǎn hū hū de má shǔ tù ná zhe dǎ dàn qì bèng le chū lái",
           "stickers": [
@@ -127,7 +127,7 @@
       "pageNumber": 2,
       "title": "会唱歌的星星布丁",
       "titlePinyin": "huì chàng gē de xīng xing bù dīng",
-      "illustration": "books/moon-dessert-shop/images/p02-3.png",
+      "illustration": "books/moon-dessert-shop/images/p02-3.webp",
       "storyParagraphs": [
         {
           "text": "小豌豆把亮闪闪的星光牛奶倒进奶油大碗里，麻薯兔踮起脚尖，撒下彩色的星星糖粉。",
@@ -141,7 +141,7 @@
       "comicLayout": "hero-bottom",
       "panels": [
         {
-          "image": "books/moon-dessert-shop/images/p02-1.png",
+          "image": "books/moon-dessert-shop/images/p02-1.webp",
           "caption": "小豌豆倒出散发星光香气的魔法牛奶。",
           "captionPinyin": "xiǎo wān dòu dào chū sàn fā xīng guāng xiāng qì de mó fǎ niú nǎi",
           "stickers": [
@@ -157,7 +157,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p02-2.png",
+          "image": "books/moon-dessert-shop/images/p02-2.webp",
           "caption": "麻薯兔踩着小木凳，撒上七彩星星糖粉。",
           "captionPinyin": "má shǔ tù cǎi zhe xiǎo mù dèng sǎ shàng qī cǎi xīng xing táng fěn",
           "stickers": [
@@ -173,7 +173,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p02-3.png",
+          "image": "books/moon-dessert-shop/images/p02-3.webp",
           "caption": "魔法烤箱打开门，金色星星布丁开心跳了起来！",
           "captionPinyin": "mó fǎ kǎo xiāng dǎ kāi mén jīn sè xīng xing bù dīng kāi xīn tiào le qǐ lái",
           "stickers": [
@@ -200,7 +200,7 @@
       "pageNumber": 3,
       "title": "第一位大客人云朵熊",
       "titlePinyin": "dì yī wèi dà kè rén yún duǒ xióng",
-      "illustration": "books/moon-dessert-shop/images/p03-1.png",
+      "illustration": "books/moon-dessert-shop/images/p03-1.webp",
       "storyParagraphs": [
         {
           "text": "香甜的味道飘过银河，把圆滚滚的云朵熊吸引来了。它围着彩虹毛线围巾，顺着彩虹桥晃晃悠悠走进甜品店。",
@@ -214,7 +214,7 @@
       "comicLayout": "hero-top",
       "panels": [
         {
-          "image": "books/moon-dessert-shop/images/p03-1.png",
+          "image": "books/moon-dessert-shop/images/p03-1.webp",
           "caption": "香喷喷的甜点味儿顺着星光飘到了彩虹桥。",
           "captionPinyin": "xiāng pēn pēn de tián diǎn wèi er shùn zhe xīng guāng piāo dào le cǎi hóng qiáo",
           "stickers": [
@@ -230,7 +230,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p03-2.png",
+          "image": "books/moon-dessert-shop/images/p03-2.webp",
           "caption": "小豌豆站在亮晶晶的柜台前招呼云朵熊。",
           "captionPinyin": "xiǎo wān dòu zhàn zài liàng jīng jīng de guì tái qián zhāo hu yún duǒ xióng",
           "stickers": [
@@ -252,7 +252,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p03-3.png",
+          "image": "books/moon-dessert-shop/images/p03-3.webp",
           "caption": "一口咬下去，整颗心都甜滋滋的！",
           "captionPinyin": "yì kǒu yǎo xià qù zhěng kē xīn dōu tián zī zī de",
           "stickers": [
@@ -273,7 +273,7 @@
       "pageNumber": 4,
       "title": "银河甜品大派对",
       "titlePinyin": "yín hé tián pǐn dà pài duì",
-      "illustration": "books/moon-dessert-shop/images/p04-3.png",
+      "illustration": "books/moon-dessert-shop/images/p04-3.webp",
       "storyParagraphs": [
         {
           "text": "背着银河小书包的糖糖星也顺着星光滑梯飞了过来，大家一起把草莓蛋糕、小月饼和星星布丁摆满长桌。",
@@ -287,7 +287,7 @@
       "comicLayout": "hero-bottom",
       "panels": [
         {
-          "image": "books/moon-dessert-shop/images/p04-1.png",
+          "image": "books/moon-dessert-shop/images/p04-1.webp",
           "caption": "爱吃甜食的糖糖星踩着滑板似的星尘飞来啦！",
           "captionPinyin": "ài chī tián shí de táng táng xīng cǎi zhe huá bǎn shì de xīng chén fēi lái la",
           "stickers": [
@@ -303,7 +303,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p04-2.png",
+          "image": "books/moon-dessert-shop/images/p04-2.webp",
           "caption": "小豌豆和麻薯兔把长桌摆得满满当当。",
           "captionPinyin": "xiǎo wān dòu hé má shǔ tù bǎ cháng zhuō bǎi de mǎn mǎn dāng dāng",
           "stickers": [
@@ -319,7 +319,7 @@
           ]
         },
         {
-          "image": "books/moon-dessert-shop/images/p04-3.png",
+          "image": "books/moon-dessert-shop/images/p04-3.webp",
           "caption": "热闹又甜蜜的银河甜品大派对正式开始！",
           "captionPinyin": "rè nao yòu tián mì de yín hé tián pǐn dà pài duì zhèng shì kāi shǐ",
           "stickers": [
