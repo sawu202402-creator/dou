@@ -456,8 +456,8 @@ export class StoryMailboxController {
         } else {
             titleEl.textContent = '🌙 画师自动巡检：已关闭';
             subEl.textContent = watcherOnline
-                ? '平时不巡检；准备画新书时打开开关即可 · 电脑哨兵待命中'
-                : '平时不巡检；准备画新书时打开开关即可';
+                ? '平时零消耗休息中；小豌豆一发点子会自动唤醒画师 · 电脑哨兵待命中'
+                : '平时零消耗休息中；小豌豆一发点子会自动打开巡检';
         }
     }
 
@@ -1164,7 +1164,7 @@ export class StoryMailboxController {
             if (wish.syncedCloud) {
                 if (this.patrol.enabled) {
                     if (this.dom.wakePrompt) this.dom.wakePrompt.hidden = true;
-                    this.dom.statusHint.textContent = '☁️ 已同步到云端魔法画本！画师正在值守，画好会发语音回信哦～';
+                    this.dom.statusHint.textContent = '☁️ 已自动唤醒魔法画师！画好后会发语音回信给你哦～';
                 } else {
                     if (this.dom.wakePrompt) this.dom.wakePrompt.hidden = false;
                     this.dom.statusHint.textContent = '🌙 已存入云端画本！点上方「✨ 召唤画师立刻来画」就能立刻动笔哦～';

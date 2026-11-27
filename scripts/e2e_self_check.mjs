@@ -140,6 +140,11 @@ function startLocalServer() {
                         status: 'pending'
                     };
                     if (!memWishes.some((w) => w.id === saved.id)) memWishes.push(saved);
+                    patrolState.enabled = true;
+                    patrolState.updatedAt = Date.now();
+                    patrolState.updatedBy = 'auto_wish';
+                    patrolState.expiresAt = Date.now() + 60 * 60 * 1000;
+                    patrolState.remainingMinutes = 60;
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         ok: true,
@@ -472,7 +477,7 @@ async function main() {
         await waitFor(`document.getElementById('smTextInput').value.includes('草莓飞机')`, 4000, 'whisper transcript');
         assert.ok(mailboxLog.transcribeCalls >= 1, '应当调用 /api/mailbox/transcribe 转写录音');
 
-        // 发送留言 -> /api/mailbox/wish AI 实时回复 + 关巡检时出现一键唤醒提示
+        // 发送留言 -> /api/mailbox/wish AI 实时回复 + 自动唤醒开启巡检（并支持手动关回）
         await evalJs(`document.getElementById('smSendBtn').click()`);
         await waitFor(
             `window.__PEA_STORY_HOUSE__.mailbox.isSending === false && !document.getElementById('smThinkingRow') && document.querySelectorAll('.sm-from-kid').length >= 1 && document.querySelectorAll('.sm-badge-live').length >= 1`,
@@ -480,9 +485,11 @@ async function main() {
             'wish & ai reply bubble'
         );
         assert.ok(mailboxLog.wishCalls >= 1, '应当调用 /api/mailbox/wish 发送留言');
-        assert.equal(await evalJs(`document.getElementById('smWakePrompt').hidden`), false, '巡检关闭时发送点子应显示一键召唤画师提示');
-        await evalJs(`document.getElementById('smWakeNowBtn').click()`);
-        await waitFor(`document.getElementById('live-status').getAttribute('aria-pressed') === 'true' && document.getElementById('smWakePrompt').hidden === true`, 3000, 'wake now button turns patrol ON');
+        await waitFor(
+            `document.getElementById('live-status').getAttribute('aria-pressed') === 'true' && document.getElementById('smPatrolSwitch').getAttribute('aria-checked') === 'true' && document.getElementById('smWakePrompt').hidden === true`,
+            3000,
+            'wish auto-enables patrol switch'
+        );
         await evalJs(`document.getElementById('smPatrolSwitch').click()`);
         await waitFor(`document.getElementById('live-status').getAttribute('aria-pressed') === 'false'`, 3000, 'restore patrol OFF');
         await saveScreenshot(cdp, sessionId, '07-split-mailbox.png');

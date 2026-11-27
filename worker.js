@@ -506,17 +506,17 @@ export class StoryMailboxDO extends DurableObject {
                 const mode = cleanStr(body.mode, 24) || "shelf";
                 const prevData = this._readAll();
 
-                // 先立刻把小豌豆的点子落盘写入 SQLite，防止后续 AI 或网络波动丢失留言
+                // 先立刻把小豌豆的点子落盘写入 SQLite，并自动开启巡检唤醒本地零 Token 哨兵
                 const savedWish = this._upsertWish({
                     ...body,
                     instantReplyKey: "",
                     instantReplyText: ""
                 });
 
-                if (this._getSetting("patrol_enabled", "0").value === "1") {
-                    const now = Date.now();
-                    this._setSetting("patrol_expires_at", String(now + PATROL_AUTO_OFF_MS), now);
-                }
+                const wakeNow = Date.now();
+                this._setSetting("patrol_enabled", "1", wakeNow);
+                this._setSetting("patrol_updated_by", "auto_wish", wakeNow);
+                this._setSetting("patrol_expires_at", String(wakeNow + PATROL_AUTO_OFF_MS), wakeNow);
 
                 let replyKey = "local_fallback";
                 let replyText = cleanStr(body.fallbackReplyText, 600) || buildFallbackArtistReply(text, bookTitle);
@@ -568,13 +568,19 @@ export class StoryMailboxDO extends DurableObject {
 
             if (request.method === "POST" && path === "/api/mailbox/sync") {
                 const body = await request.json().catch(() => ({}));
-                if (Array.isArray(body.wishes)) {
+                if (Array.isArray(body.wishes) && body.wishes.length > 0) {
                     for (const w of body.wishes.slice(0, 50)) {
                         this._upsertWish(w);
                     }
+                    if (this._readPendingWishes().length > 0) {
+                        const wakeNow = Date.now();
+                        this._setSetting("patrol_enabled", "1", wakeNow);
+                        this._setSetting("patrol_updated_by", "auto_wish", wakeNow);
+                        this._setSetting("patrol_expires_at", String(wakeNow + PATROL_AUTO_OFF_MS), wakeNow);
+                    }
                 }
                 const { wishes, replies } = this._readAll();
-                return jsonResponse({ ok: true, wishes, replies, serverTime: Date.now() });
+                return jsonResponse({ ok: true, wishes, replies, patrol: this._getPatrolState(), serverTime: Date.now() });
             }
 
             if (request.method === "POST" && path === "/api/mailbox/reply") {
