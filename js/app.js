@@ -678,6 +678,7 @@ const hotWatcher = new HotReloadWatcher({
         state.hotReloadCount += 1;
         state.latestVersionInfo = data;
         state.updatedBookId = data.latestBookId || '';
+        audioEngine.clearCache();
 
         await fetchManifest().catch(() => {});
 

@@ -90,7 +90,7 @@ export const ROLE_NEURAL_VOICES = {
     star_boy:      { voice: "zh-CN-YunxiaNeural",   rate: "+5%", pitch: "+4Hz" },
     prince:        { voice: "zh-CN-YunxiNeural",    rate: "+0%", pitch: "+0Hz" },
     grandpa:       { voice: "zh-CN-YunxiNeural",    rate: "-8%", pitch: "-6Hz" },
-    fairy:         { voice: "zh-TW-HsiaoYuNeural",  rate: "+1%", pitch: "+5Hz" },
+    fairy:         { voice: "zh-CN-XiaoxiaoNeural", rate: "+3%", pitch: "+5Hz" },
     cat:           { voice: "zh-CN-XiaoyiNeural",   rate: "+5%", pitch: "+6Hz" }
 };
 

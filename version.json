@@ -1,9 +1,9 @@
 {
-  "version": "2026.11.27.004",
-  "updatedAt": "2026-11-27T18:13:00+05:30",
-  "latestBookId": "yanyan-sea-wave-adventure",
+  "version": "2026.11.27.005",
+  "updatedAt": "2026-11-27T18:15:30+05:30",
+  "latestBookId": "rainbow-sea-adventure",
   "latestPage": 1,
-  "changeType": "new_book",
-  "summary": "新书上线：《小豌豆和烟烟的踏浪奇遇》（4页全彩有声绘本与漫画）",
-  "announcement": "小豌豆！你和好朋友烟烟的《小豌豆和烟烟的踏浪奇遇》已经画好摆上书架第一位咯！快点开看看你们骑海浪追海鸥的画面吧！"
+  "changeType": "updated_book",
+  "summary": "优化《小豌豆和彩虹的海上大冒险》彩虹配音，换上甜美清晰的少女声音",
+  "announcement": "小豌豆！我已经给《小豌豆和彩虹的海上大冒险》里的彩虹换上了甜美清脆的新声音，现在再去漫画版点点她的气泡听听看吧！"
 }

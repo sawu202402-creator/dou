@@ -192,6 +192,10 @@ export class StoryAudioEngine {
         }
     }
 
+    clearCache() {
+        this._ttsMemCache.clear();
+    }
+
     _clearTimers() {
         if (this._activeFallbackTimer) {
             clearTimeout(this._activeFallbackTimer);
