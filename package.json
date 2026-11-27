@@ -7,6 +7,7 @@
   "scripts": {
     "validate": "node scripts/validate_books.mjs",
     "test:e2e": "node scripts/e2e_self_check.mjs",
+    "mailbox:pull": "node scripts/mailbox_cli.mjs pull",
     "dev": "npx wrangler dev",
     "deploy": "npx wrangler deploy"
   }

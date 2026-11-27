@@ -6,6 +6,7 @@
 
 import { StoryAudioEngine } from './audioEngine.js';
 import { HotReloadWatcher } from './hotReload.js';
+import { StoryMailboxController } from './storyMailbox.js';
 import {
     renderBookshelf,
     renderStorybookPage,
@@ -31,6 +32,8 @@ const btnAutoplay = document.getElementById('btn-autoplay');
 const autoplayIconEl = document.getElementById('autoplay-icon');
 const autoplayLabelEl = document.getElementById('autoplay-label');
 const btnToggleMute = document.getElementById('btn-toggle-mute');
+const btnOpenMailbox = document.getElementById('btn-open-mailbox');
+const mailboxUnreadBadge = document.getElementById('mailbox-unread-badge');
 const readerFooterEl = document.getElementById('reader-footer');
 const btnPrevPage = document.getElementById('btn-prev-page');
 const btnNextPage = document.getElementById('btn-next-page');
@@ -56,7 +59,9 @@ const state = {
     autoplayRunId: 0,
     latestVersionInfo: null,
     updatedBookId: '',
-    hotReloadCount: 0
+    hotReloadCount: 0,
+    bannerMode: 'version',
+    bannerReplyText: ''
 };
 
 try {
@@ -69,6 +74,27 @@ const audioEngine = new StoryAudioEngine({
         if (btnToggleMute) {
             btnToggleMute.textContent = audioState.muted ? '🔇' : '🔊';
             btnToggleMute.setAttribute('aria-pressed', String(audioState.muted));
+        }
+    }
+});
+
+const storyMailbox = new StoryMailboxController({
+    audioEngine,
+    getContext: () => ({
+        view: state.view,
+        bookId: state.currentBook?.id || '',
+        bookTitle: state.currentBook?.title || '',
+        pageNumber: (state.pageIndex || 0) + 1,
+        mode: state.mode
+    }),
+    onBeforeOpen: () => stopAutoplay(),
+    onJumpToBook: (bookId, pageNum) => openBook(bookId, pageNum, null, { flashMagic: true }),
+    onNewReply: (reply) => {
+        state.bannerMode = 'mailbox';
+        state.bannerReplyText = reply.text || '';
+        if (hotBannerEl && hotBannerMsgEl) {
+            hotBannerMsgEl.textContent = `🪄 魔法故事画师给你回信啦：${(reply.text || '').slice(0, 32)}…`;
+            hotBannerEl.hidden = false;
         }
     }
 });
@@ -335,6 +361,10 @@ function renderCurrentView({ flashMagic = false } = {}) {
             onOpenBook: (bookId) => {
                 audioEngine.unlockInGesture();
                 openBook(bookId, 1);
+            },
+            onOpenMailbox: () => {
+                audioEngine.unlockInGesture();
+                storyMailbox.open();
             }
         });
         return;
@@ -468,6 +498,11 @@ function bindEvents() {
         audioEngine.setMuted(nextMuted);
     });
 
+    btnOpenMailbox?.addEventListener('click', () => {
+        audioEngine.unlockInGesture();
+        storyMailbox.open();
+    });
+
     btnPrevPage.addEventListener('click', () => {
         audioEngine.unlockInGesture();
         goToPage(state.pageIndex - 1);
@@ -480,8 +515,12 @@ function bindEvents() {
 
     btnBannerGo.addEventListener('click', () => {
         audioEngine.unlockInGesture();
-        const info = state.latestVersionInfo;
         hotBannerEl.hidden = true;
+        if (state.bannerMode === 'mailbox') {
+            storyMailbox.open();
+            return;
+        }
+        const info = state.latestVersionInfo;
         if (info?.latestBookId) {
             openBook(info.latestBookId, info.latestPage || 1, null, { flashMagic: true });
         }
@@ -489,9 +528,11 @@ function bindEvents() {
 
     btnBannerReplay.addEventListener('click', () => {
         audioEngine.unlockInGesture();
-        const msg = state.latestVersionInfo?.announcement || hotBannerMsgEl.textContent;
+        const msg = state.bannerMode === 'mailbox'
+            ? state.bannerReplyText
+            : (state.latestVersionInfo?.announcement || hotBannerMsgEl.textContent);
         if (msg) {
-            audioEngine.speak(msg, 'system_notice');
+            audioEngine.speak(msg, state.bannerMode === 'mailbox' ? 'narrator' : 'system_notice');
         }
     });
 
@@ -565,7 +606,9 @@ const hotWatcher = new HotReloadWatcher({
             renderCurrentView();
         }
 
+        state.bannerMode = 'version';
         showHotReloadBanner(data);
+        storyMailbox.syncFromCloud().catch(() => {});
         if (data.announcement && !audioEngine.muted) {
             audioEngine.speak(data.announcement, 'system_notice').catch(() => {});
         }
@@ -574,6 +617,8 @@ const hotWatcher = new HotReloadWatcher({
 
 async function bootstrap() {
     bindEvents();
+    storyMailbox.bindBadgeEl(mailboxUnreadBadge);
+    storyMailbox.init();
     try {
         await fetchManifest();
         const params = new URLSearchParams(window.location.search);
@@ -605,7 +650,8 @@ window.__PEA_STORY_HOUSE__ = {
         isSpeaking: audioEngine.isSpeaking
     }),
     checkVersionNow: () => hotWatcher.checkNow(),
-    audioEngine
+    audioEngine,
+    mailbox: storyMailbox
 };
 
 bootstrap();

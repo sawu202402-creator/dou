@@ -60,6 +60,9 @@ function makeSilentWavBase64(durationSec = 0.1) {
 function startLocalServer() {
     const sampleWavBase64 = makeSilentWavBase64(0.08);
     const ttsLog = [];
+    const memWishes = [];
+    const memReplies = [];
+    const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0 };
     let liveVersionObj = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
 
     const srv = http.createServer((req, res) => {
@@ -68,7 +71,7 @@ function startLocalServer() {
 
         if (urlPath === '/api/health') {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ ok: true, service: 'pea-story-house-e2e' }));
+            res.end(JSON.stringify({ ok: true, service: 'pea-story-house-e2e', ai: true, mailbox: true }));
             return;
         }
 
@@ -87,6 +90,88 @@ function startLocalServer() {
                     'Cache-Control': 'no-store'
                 });
                 res.end(JSON.stringify({ ok: true, role: parsed.role || 'narrator', audioBase64: sampleWavBase64 }));
+            });
+            return;
+        }
+
+        if (urlPath === '/api/mailbox/transcribe' && req.method === 'POST') {
+            const chunks = [];
+            req.on('data', (c) => chunks.push(c));
+            req.on('end', () => {
+                mailboxLog.transcribeCalls += 1;
+                const buf = Buffer.concat(chunks);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({
+                    ok: buf.length > 20,
+                    audioBytes: buf.length,
+                    text: '我想让麻薯兔开一架草莓飞机去云朵上找新朋友！',
+                    model: '@cf/openai/whisper-large-v3-turbo'
+                }));
+            });
+            return;
+        }
+
+        if (urlPath.startsWith('/api/mailbox')) {
+            let bodyRaw = '';
+            req.on('data', (chunk) => { bodyRaw += chunk.toString(); });
+            req.on('end', () => {
+                const body = bodyRaw ? JSON.parse(bodyRaw) : {};
+                if (req.method === 'POST' && urlPath === '/api/mailbox/wish') {
+                    mailboxLog.wishCalls += 1;
+                    const replyText = `哇小豌豆！你说的「${String(body.text || '').slice(0, 18)}」太有趣啦，我已经记进云端魔法画本里咯！`;
+                    const saved = {
+                        ...body,
+                        instantReplyKey: 'ai_live',
+                        instantReplyText: replyText,
+                        status: 'pending'
+                    };
+                    if (!memWishes.some((w) => w.id === saved.id)) memWishes.push(saved);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        ok: true,
+                        aiGenerated: true,
+                        aiModel: '@cf/qwen/qwen3-30b-a3b-fp8',
+                        replyKey: 'ai_live',
+                        replyText,
+                        audioBase64: sampleWavBase64,
+                        wishes: memWishes,
+                        replies: memReplies
+                    }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/mailbox/sync') {
+                    for (const w of (body.wishes || [])) {
+                        if (w?.id && !memWishes.some((x) => x.id === w.id)) memWishes.push(w);
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, wishes: memWishes, replies: memReplies }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/mailbox/reply') {
+                    mailboxLog.replyCalls += 1;
+                    const replyEntry = {
+                        id: body.id || `reply_${Date.now()}`,
+                        replyToId: body.replyToId || '',
+                        senderName: body.senderName || '魔法故事画师',
+                        badgeTitle: body.badgeTitle || '🎉 新故事画好啦！',
+                        bookId: body.bookId || '',
+                        pageNumber: Number(body.pageNumber || 1),
+                        createdAt: body.createdAt || Date.now(),
+                        createdStr: body.createdStr || '11/27 17:45',
+                        text: body.text || ''
+                    };
+                    memReplies.push(replyEntry);
+                    if (replyEntry.replyToId) {
+                        for (const w of memWishes) {
+                            if (w.id === replyEntry.replyToId) w.status = 'fulfilled';
+                        }
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, wishes: memWishes, replies: memReplies }));
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ ok: true, wishes: memWishes, replies: memReplies }));
             });
             return;
         }
@@ -143,7 +228,9 @@ function startLocalServer() {
             resolve({
                 server: srv,
                 port: srv.address().port,
-                ttsLog
+                ttsLog,
+                mailboxLog,
+                memWishes
             });
         });
     });
@@ -160,6 +247,8 @@ function launchChrome() {
             '--disable-gpu',
             '--remote-debugging-port=0',
             '--autoplay-policy=no-user-gesture-required',
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
             '--window-size=1180,820',
             'about:blank'
         ]);
@@ -232,7 +321,7 @@ async function saveScreenshot(cdp, sessionId, filename) {
 }
 
 async function main() {
-    const { server, port, ttsLog } = await startLocalServer();
+    const { server, port, ttsLog, mailboxLog, memWishes } = await startLocalServer();
     const origin = `http://127.0.0.1:${port}`;
     console.log(`🌐 E2E server listening at ${origin}`);
 
@@ -312,6 +401,46 @@ async function main() {
         assert.equal(shelfOverflow, true, '分屏书架存在横向溢出');
         await saveScreenshot(cdp, sessionId, '01-split-shelf.png');
         console.log('✓ [590x820] 书架渲染、封面图加载、零横向溢出');
+
+        // 测试站内「🪄 聊故事」魔法画师语音/文字对话与云端回信
+        await evalJs(`document.getElementById('btn-shelf-open-mailbox').click()`);
+        await waitFor(`document.getElementById('storyMailboxOverlay').hidden === false`, 3000, 'open mailbox modal');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '分屏对话弹窗存在横向溢出');
+
+        // 真实模拟麦克风录音 -> /api/mailbox/transcribe
+        await evalJs(`document.getElementById('smMicBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.mailbox.isRecording === true`, 3000, 'mic recording start');
+        await sleep(450);
+        await evalJs(`document.getElementById('smMicBtn').click()`);
+        await waitFor(`document.getElementById('smTextInput').value.includes('草莓飞机')`, 4000, 'whisper transcript');
+        assert.ok(mailboxLog.transcribeCalls >= 1, '应当调用 /api/mailbox/transcribe 转写录音');
+
+        // 发送留言 -> /api/mailbox/wish AI 实时回复 + 语音播报
+        await evalJs(`document.getElementById('smSendBtn').click()`);
+        await waitFor(`document.querySelectorAll('.sm-from-kid').length >= 1 && document.querySelectorAll('.sm-badge-live').length >= 1`, 4000, 'wish & ai reply bubble');
+        assert.ok(mailboxLog.wishCalls >= 1, '应当调用 /api/mailbox/wish 发送留言');
+        await saveScreenshot(cdp, sessionId, '07-split-mailbox.png');
+
+        // 注入正式画师回信并验证一键跳书页
+        const firstWishId = memWishes[0]?.id || '';
+        await fetch(`${origin}/api/mailbox/reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                replyToId: firstWishId,
+                bookId: 'moon-dessert-shop',
+                pageNumber: 3,
+                badgeTitle: '🎉 新故事画好啦！',
+                text: '小豌豆，你的草莓飞机点子超棒！快看看第 3 页吧！'
+            })
+        });
+        await evalJs(`window.__PEA_STORY_HOUSE__.mailbox.syncFromCloud()`);
+        await waitFor(`Boolean(document.querySelector('.sm-jump-btn'))`, 4000, 'formal reply jump button');
+        await evalJs(`document.querySelector('.sm-jump-btn').click()`);
+        await waitFor(`document.getElementById('storyMailboxOverlay').hidden === true && window.__PEA_STORY_HOUSE__.getState().view === 'reader' && window.__PEA_STORY_HOUSE__.getState().pageIndex === 2`, 4000, 'jump to book page 3');
+        await evalJs(`document.getElementById('btn-back-shelf').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'return to shelf');
+        console.log('✓ [590x820] 站内语音识别、AI实时陪聊与云端回信直达书页通过');
 
         // 点击书卡进入精装有声绘本模式
         await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"]').click()`);

@@ -134,9 +134,25 @@
 
 ---
 
-## 4. 关键工程命令速查
+## 4. 云端魔法传声屋收发规范（小豌豆独立端内语音/文字对话）
+当小豌豆在 iPad 独立桌面版或全屏网页里直接点击顶部「🪄 聊故事」或书架提示卡，通过麦克风语音（Whisper 转文字）或打字向你提出新故事创意时：
+1. **拉取查看留言**：
+   ```bash
+   node scripts/mailbox_cli.mjs pull
+   ```
+   （首次使用需绑定线上域名：`node scripts/mailbox_cli.mjs set-url https://<你的线上域名>`）
+2. **完成第 2 节全部 5 步创作与推送**：编写 `book.json`/`manifest.json`、生成无字插画、校验与 E2E 自检、更新 `version.json` 并推送 `origin/main`。
+3. **发送正式画师回信（带新书直达按钮与语音播报）**：
+   ```bash
+   node scripts/mailbox_cli.mjs reply --to <wishId> --book <bookId> --page <pageNumber> --badge "🎉 新故事画好啦！" --text "小豌豆！你要的……已经画好送到书架上啦，点下面按钮就能直接看！"
+   ```
+
+---
+
+## 5. 关键工程命令速查
 - 语法检查：`node --check worker.js edgeTtsMod.js js/*.js scripts/*.mjs`
 - 书库与拼音校验：`npm run validate`（即 `node scripts/validate_books.mjs`）
 - 无头浏览器全量自检：`npm run test:e2e`（即 `node scripts/e2e_self_check.mjs`）
+- 拉取小豌豆云端留言：`npm run mailbox:pull`
 - 本地启动 Cloudflare Worker：`npx wrangler dev`
 - 部署到 Cloudflare Workers：`npx wrangler deploy`

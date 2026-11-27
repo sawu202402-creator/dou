@@ -264,6 +264,34 @@ button {
     box-shadow: 0 2px 0 #F5A3BF;
 }
 
+.btn-mailbox {
+    position: relative;
+    background: linear-gradient(135deg, #FFF0F6 0%, #FFE4EE 100%);
+    border-color: #FF87B0;
+    color: #A82252;
+    box-shadow: 0 2px 0 #F5A3BF;
+}
+
+.unread-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #E0315A;
+    color: #FFFFFF;
+    font-size: 0.7rem;
+    font-weight: 900;
+    line-height: 1;
+}
+    background: var(--pink-soft);
+    border-color: var(--pink-berry);
+    color: #B62A5A;
+    box-shadow: 0 2px 0 #F5A3BF;
+}
+
 .btn-mute {
     min-width: 42px;
     padding: 6px 10px;
@@ -531,9 +559,30 @@ button {
     text-align: center;
     padding: 24px 18px;
     border-radius: 22px;
-    background: rgba(255, 252, 246, 0.72);
+    background: rgba(255, 252, 246, 0.85);
     border: 2.5px dashed #DFC4A0;
     min-height: 260px;
+    width: 100%;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.book-magic-card:hover,
+.book-magic-card:focus-visible {
+    transform: translateY(-4px);
+    border-color: var(--pink-berry);
+    background: #FFF6FA;
+    outline: none;
+}
+
+.magic-card-cta {
+    margin-top: 12px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #FF7CA6, #FF9966);
+    color: #FFFFFF;
+    font-size: 0.84rem;
+    font-weight: 800;
+    box-shadow: 0 3px 0 #D85879;
 }
 
 .magic-card-icon {

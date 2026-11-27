@@ -11,3 +11,4 @@ wrangler.jsonc
 GEMINI.md
 *.md
 .DS_Store
+.mailbox-config.json

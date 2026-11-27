@@ -2,8 +2,27 @@
   "name": "pea-story-house",
   "main": "worker.js",
   "compatibility_date": "2026-09-01",
+  "ai": {
+    "binding": "AI"
+  },
   "assets": {
     "directory": ".",
     "binding": "ASSETS"
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "STORY_MAILBOX",
+        "class_name": "StoryMailboxDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "StoryMailboxDO"
+      ]
+    }
+  ]
 }

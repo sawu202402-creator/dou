@@ -482,4 +482,78 @@ export class StoryAudioEngine {
 
         return finishPromise;
     }
+
+    /**
+     * 直接播放服务端随请求返回的音频 Base64；若缺失或受阻则自动降级到 speak()
+     */
+    async playBase64Audio(b64, fallbackText = '', role = 'narrator', callbacks = {}) {
+        const cleanB64 = String(b64 || '').trim();
+        const cleanFallback = cleanTextForTts(fallbackText);
+        if (this.muted) {
+            return { ok: false, mode: 'idle', cancelled: false };
+        }
+        if (!cleanB64) {
+            return cleanFallback ? this.speak(cleanFallback, role, callbacks) : { ok: false, mode: 'idle', cancelled: false };
+        }
+
+        if (cleanFallback) {
+            this._ttsMemCache.set(`${role}::${cleanFallback}`, cleanB64);
+        }
+
+        this.stop();
+        const token = ++this._speakToken;
+        this.isSpeaking = true;
+        this._pendingGesturePlay = null;
+        this._notify();
+        if (typeof callbacks.onStart === 'function') {
+            try { callbacks.onStart(); } catch (_) {}
+        }
+
+        const finishPromise = new Promise((resolve) => {
+            this._activeResolve = resolve;
+        });
+
+        const finalize = (result) => {
+            if (token === this._speakToken) {
+                this.isSpeaking = false;
+                if (this._activeResolve) {
+                    const resFn = this._activeResolve;
+                    this._activeResolve = null;
+                    resFn(result);
+                }
+                this._notify();
+                if (typeof callbacks.onEnd === 'function') {
+                    try { callbacks.onEnd(result); } catch (_) {}
+                }
+            }
+        };
+
+        (async () => {
+            try {
+                const cloudRes = await this._playBase64AndAwaitEnd(cleanB64, token);
+                if (token !== this._speakToken || this.muted) {
+                    finalize({ ok: true, mode: this.lastPlaybackMode, cancelled: true });
+                    return;
+                }
+                if (cloudRes.played) {
+                    finalize({ ok: true, mode: cloudRes.mode, cancelled: false });
+                    return;
+                }
+                if (cleanFallback) {
+                    const localRes = await this._playLocalSpeechAndAwaitEnd(cleanFallback, role, token);
+                    finalize({
+                        ok: Boolean(localRes.played),
+                        mode: localRes.mode || 'idle',
+                        cancelled: token !== this._speakToken
+                    });
+                    return;
+                }
+                finalize({ ok: false, mode: 'idle', cancelled: false });
+            } catch (_) {
+                finalize({ ok: false, mode: 'idle', cancelled: false });
+            }
+        })();
+
+        return finishPromise;
+    }
 }

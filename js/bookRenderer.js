@@ -19,7 +19,7 @@ export function buildComicBubbleSpeakKey(bookId, pageNumber, panelIdx, bubbleIdx
 /**
  * 渲染个人专属书架
  */
-export function renderBookshelf(container, books, { latestBookId = '', updatedJustNow = false, onOpenBook } = {}) {
+export function renderBookshelf(container, books, { latestBookId = '', updatedJustNow = false, onOpenBook, onOpenMailbox } = {}) {
     if (!container) return;
 
     const cardsHtml = (books || []).map((book) => {
@@ -46,11 +46,12 @@ export function renderBookshelf(container, books, { latestBookId = '', updatedJu
     }).join('');
 
     const magicHintCard = `
-        <aside class="book-magic-card" aria-label="创作新故事提示">
-            <div class="magic-card-icon">🪄🐰✨</div>
+        <button type="button" id="btn-shelf-open-mailbox" class="book-magic-card" aria-label="点这里跟魔法画师说话创作新故事">
+            <div class="magic-card-icon">🪄🐰🎙️</div>
             <h3>想要更多新故事吗？</h3>
-            <p>在左屏跟魔法画师说说你的新点子，新画好的绘本和漫画就会自己飞到这个书架上哦！</p>
-        </aside>
+            <p>点这里直接用语音或打字告诉魔法画师你的新点子，画好就会飞到书架上哦！</p>
+            <span class="magic-card-cta">🎙️ 跟魔法画师聊故事</span>
+        </button>
     `;
 
     container.innerHTML = `
@@ -82,6 +83,11 @@ export function renderBookshelf(container, books, { latestBookId = '', updatedJu
             }
         });
     });
+
+    const shelfMailboxBtn = container.querySelector('#btn-shelf-open-mailbox');
+    if (shelfMailboxBtn && typeof onOpenMailbox === 'function') {
+        shelfMailboxBtn.addEventListener('click', () => onOpenMailbox());
+    }
 }
 
 /**

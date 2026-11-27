@@ -15,6 +15,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/mailbox.css">
 </head>
 <body>
     <div id="app" class="app-shell" data-view="shelf" data-mode="storybook" data-pinyin="on">
@@ -54,6 +55,12 @@
                 <button type="button" id="btn-autoplay" class="ctrl-pill btn-autoplay" hidden aria-pressed="false" title="全书多角色连播">
                     <span id="autoplay-icon">▶️</span>
                     <span id="autoplay-label">连播</span>
+                </button>
+
+                <button type="button" id="btn-open-mailbox" class="ctrl-pill btn-mailbox" title="跟魔法画师说话，告诉她你想画什么新故事！">
+                    <span>🪄</span>
+                    <span>聊故事</span>
+                    <span id="mailbox-unread-badge" class="unread-badge" hidden>1</span>
                 </button>
 
                 <button type="button" id="btn-toggle-mute" class="ctrl-pill btn-mute" aria-pressed="false" aria-label="静音开关" title="声音开关">
