@@ -884,11 +884,13 @@ const hotWatcher = new HotReloadWatcher({
             renderCurrentView();
         }
 
-        state.bannerMode = 'version';
-        showHotReloadBanner(data);
         storyMailbox.syncFromCloud().catch(() => {});
-        if (data.announcement && !audioEngine.muted) {
-            audioEngine.speak(data.announcement, 'system_notice').catch(() => {});
+        if (!data.silent) {
+            state.bannerMode = 'version';
+            showHotReloadBanner(data);
+            if (data.announcement && !audioEngine.muted) {
+                audioEngine.speak(data.announcement, 'system_notice').catch(() => {});
+            }
         }
     }
 });

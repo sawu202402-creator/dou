@@ -60,7 +60,11 @@ function main() {
 
     // 2. 验证 version.json
     const versionData = readJson('version.json');
-    for (const key of ['version', 'updatedAt', 'latestBookId', 'latestPage', 'changeType', 'summary', 'announcement']) {
+    const requiredVersionKeys = ['version', 'updatedAt', 'latestBookId', 'latestPage', 'changeType', 'summary'];
+    if (versionData.silent !== true) {
+        requiredVersionKeys.push('announcement');
+    }
+    for (const key of requiredVersionKeys) {
         assert.ok(versionData[key] !== undefined && versionData[key] !== '', `version.json 缺少字段: ${key}`);
     }
 

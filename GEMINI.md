@@ -68,7 +68,12 @@
   - `latestPage`：本次新增或修改的起始页码（从 1 开始）。
   - `changeType`：`new_book` | `new_page` | `updated_page` | `updated_book`。
   - `summary`：简短更新摘要。
-  - `announcement`：用温柔、欢快、像魔法姐姐对小豌豆说话的口吻写一句播报词（30~65 字，例如：“小豌豆！你的新故事第 5 页已经画好送到右屏啦，快点开看看麻薯兔又发现了什么宝贝！”），网页轮询到新版本会自动用温柔真人语音读给她听。
+  - `silent`（布尔值，可选）：**来源区分规则（必须严格遵守）**：
+    - **如果是我们在当前对话框里直接沟通的改动**（代码/功能优化、或家长在对话框里直接提出的绘本改动）：
+      - 仅代码/界面/工程优化：**不要修改 `version.json`**，绝不发云端回信，绝不在网页播放语音；
+      - 绘本/故事数据改动如需网页端无感刷新：`version.json` 必须设置 `"silent": true`（网页自动静音原地刷新，不弹窗横幅、不播语音），且不要调用 `mailbox_cli.mjs reply`。
+    - **如果是小豌豆在网页「🪄 聊故事」主动提交的留言**：`silent` 设为 `false`（或不写），同时写入 `announcement`（30~65 字温柔播报词），网页轮询到新版本会自动用温柔真人语音读给她听，并调用 `mailbox_cli.mjs reply` 发送正式回信。
+  - `announcement`：`silent` 不为 `true` 时必填，用温柔、欢快、像魔法姐姐对小豌豆说话的口吻写一句播报词（30~65 字，例如：“小豌豆！你的新故事第 5 页已经画好送到右屏啦，快点开看看麻薯兔又发现了什么宝贝！”）。
 
 ### 第 5 步：自动提交并推送 Git
 1. 暂存并提交全部改动（包含新生成的插画、数据文件与 `version.json`）：
@@ -147,8 +152,10 @@
    - 平时挂起 `node scripts/watch_mailbox.mjs`（后台非守护进程模式 `IsDaemon: false`，不设 `NotificationTimeoutSeconds`），全程 **0 AI Token 消耗**；
    - 当检测到网页端开启巡检开关且有 `pending` 留言时，哨兵会自动退出并唤醒你执行第 2 节全部 5 步创作流程；
    - 完成创作、推送并发送正式回信后，自动重新启动 `node /home/better/IdeaProjects/dou/scripts/watch_mailbox.mjs` 回到零 Token 静默待命状态。
-3. **完成第 2 节全部 5 步创作与推送**：编写 `book.json`/`manifest.json`、生成无字插画、校验与 E2E 自检、更新 `version.json` 并推送 `origin/main`。
-4. **发送正式画师回信（带新书直达按钮与语音播报）**：
+3. **按需执行创作与静默/播报区分**：
+   - 若来源是小豌豆在网页「🪄 聊故事」发来的留言：完整执行第 2 节 5 步流水线，更新 `version.json`（不设 `silent: true`，带 `announcement` 触发语音播报），并调用 `mailbox_cli.mjs reply` 发送正式回信。
+   - 若来源是当前对话窗口直接沟通的技术改动或故事修改：**不向网页发送语音播报，不发送 `mailbox_cli.mjs reply`**（仅工程改动不改 `version.json`；如故事数据需热刷新则设 `"silent": true`）。
+4. **发送正式画师回信（仅针对「🪄 聊故事」云端留言）**：
    ```bash
    node scripts/mailbox_cli.mjs reply --to <wishId> --book <bookId> --page <pageNumber> --badge "🎉 新故事画好啦！" --text "小豌豆！你要的……已经画好送到书架上啦，点下面按钮就能直接看！"
    ```
