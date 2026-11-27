@@ -1,0 +1,18 @@
+{
+  "name": "小豌豆魔法故事漫画屋",
+  "short_name": "小豌豆故事屋",
+  "description": "专为二年级小朋友小豌豆打造的 iPad 横屏分屏实时有声绘本与彩色漫画屋",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#FFF6E8",
+  "theme_color": "#FFF6E8",
+  "icons": [
+    {
+      "src": "books/moon-dessert-shop/images/cover.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "books": [
+    {
+      "id": "moon-dessert-shop",
+      "title": "小豌豆的月亮甜品店",
+      "emoji": "🐰",
+      "subtitle": "坐上棉花糖热气球，去弯弯的月亮上开一家会发光的甜品店吧！",
+      "author": "小豌豆 & 魔法画师",
+      "cover": "books/moon-dessert-shop/images/cover.png",
+      "pageCount": 4,
+      "defaultMode": "storybook",
+      "tags": ["童话", "甜品", "月亮"],
+      "updatedAt": "2026-11-27T17:10:00+05:30"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Wrangler & logs
+.wrangler/
+*.log
+*.tmp
+scratch/
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

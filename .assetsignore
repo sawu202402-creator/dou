@@ -1,0 +1,13 @@
+.git
+.gitignore
+.wrangler
+node_modules
+package.json
+package-lock.json
+scripts
+worker.js
+edgeTtsMod.js
+wrangler.jsonc
+GEMINI.md
+*.md
+.DS_Store
