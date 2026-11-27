@@ -1,0 +1,346 @@
+{
+  "id": "yanyan-sea-wave-adventure",
+  "title": "小豌豆和烟烟的踏浪奇遇",
+  "titlePinyin": "xiǎo wān dòu hé yān yān de tà làng qí yù",
+  "emoji": "🌊",
+  "subtitle": "抱起可爱的贝壳冲浪板，和小豌豆、好朋友烟烟一起踏浪追海鸥、找海星去吧！",
+  "author": "小豌豆 & 魔法画师",
+  "cover": "books/yanyan-sea-wave-adventure/images/cover.webp",
+  "artStyleBible": "Warm whimsical children's picture book watercolor and gouache illustration, soft warm-brown storybook ink outlines, sunlit turquoise ocean, fluffy cloud-white sea foam, coral pink, mint green, and golden sunset palette, Studio Ghibli / European picture book charm, strictly no text/words/letters/Chinese characters/speech bubbles/watermarks. Characters: Xiao Wandou (7yo Chinese girl with two neat hair buns tied with pink ribbons, cream plush bunny-ear hairband, pink-and-white swimwear, mint star-patterned life vest with tiny green pea badge); Yanyan (7yo Chinese girl best friend with shoulder-length wavy dark hair, twin lavender butterfly hairpins, lavender-and-cream swimwear, yellow star-patterned life vest); Puffy Seagull (plump cute white seagull wearing tiny sky-blue goggles on its head); Straw-Hat Baby Turtle (plump mint-green baby sea turtle wearing a miniature golden straw sunhat).",
+  "characters": {
+    "narrator": {
+      "name": "故事姐姐",
+      "emoji": "🪄",
+      "voiceRole": "narrator",
+      "bubbleBg": "#FFF8E7",
+      "bubbleBorder": "#E0A82E",
+      "badgeBg": "#FFEAA7"
+    },
+    "pea": {
+      "name": "小豌豆",
+      "emoji": "🐰",
+      "voiceRole": "pea",
+      "bubbleBg": "#FFF0F6",
+      "bubbleBorder": "#FF7FA5",
+      "badgeBg": "#FFD6E5"
+    },
+    "yanyan": {
+      "name": "烟烟",
+      "emoji": "🦋",
+      "voiceRole": "fairy",
+      "bubbleBg": "#F3EFFF",
+      "bubbleBorder": "#8E75E6",
+      "badgeBg": "#E2D6FF"
+    },
+    "seagull": {
+      "name": "胖海鸥",
+      "emoji": "🕊️",
+      "voiceRole": "star_boy",
+      "bubbleBg": "#EAF7FF",
+      "bubbleBorder": "#56A8F5",
+      "badgeBg": "#CFEAFF"
+    },
+    "turtle": {
+      "name": "草帽海龟",
+      "emoji": "🐢",
+      "voiceRole": "bear",
+      "bubbleBg": "#E8FFF5",
+      "bubbleBorder": "#34B89A",
+      "badgeBg": "#C3F7E4"
+    }
+  },
+  "pages": [
+    {
+      "pageNumber": 1,
+      "title": "粉粉冲浪板出发啦",
+      "titlePinyin": "fěn fěn chōng làng bǎn chū fā la",
+      "illustration": "books/yanyan-sea-wave-adventure/images/p01-1.webp",
+      "storyParagraphs": [
+        {
+          "text": "太阳公公把海面照得金闪闪的，小豌豆和烟烟穿上星星救生衣，抱起粉色和薄荷绿的贝壳冲浪板跑向海边。",
+          "pinyin": "tài yáng gōng gong bǎ hǎi miàn zhào de jīn shǎn shǎn de xiǎo wān dòu hé yān yān chuān shàng xīng xing jiù shēng yī bào qǐ fěn sè hé bò he lǜ de bèi ké chōng làng bǎn pǎo xiàng hǎi biān"
+        },
+        {
+          "text": "两人扣好安全扣击掌加油，戴着小眼镜的胖海鸥扑棱着翅膀俯冲下来，要给她们当领航员呢！",
+          "pinyin": "liǎng rén kòu hǎo ān quán kòu jī zhǎng jiā yóu dài zhe xiǎo yǎn jìng de pàng hǎi ōu pū leng zhe chì bǎng fǔ chōng xià lái yào gěi tā men dāng lǐng háng yuán ne"
+        }
+      ],
+      "comicLayout": "hero-top",
+      "panels": [
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p01-1.webp",
+          "caption": "小豌豆和烟烟抱着贝壳冲浪板来到阳光沙滩。",
+          "captionPinyin": "xiǎo wān dòu hé yān yān bào zhe bèi ké chōng làng bǎn lái dào yáng guāng shā tān",
+          "stickers": [
+            { "text": "出发！🏄‍♀️", "style": "pop-pink", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "烟烟，大海的浪花闪着银光，好凉快呀！",
+              "pinyin": "yān yān dà hǎi de làng huā shǎn zhe yín guāng hǎo liáng kuài ya",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p01-2.webp",
+          "caption": "出发前先帮好朋友检查救生衣扣子！",
+          "captionPinyin": "chū fā qián xiān bāng hǎo péng you jiǎn chá jiù shēng yī kòu zi",
+          "stickers": [
+            { "text": "啪嗒！✨", "style": "pop-gold", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "yanyan",
+              "text": "扣好啦！我们准备一起踏浪去咯！",
+              "pinyin": "kòu hǎo la wǒ men zhǔn bèi yì qǐ tà làng qù lo",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p01-3.webp",
+          "caption": "戴蓝色护目镜的胖海鸥飞过来凑热闹啦！",
+          "captionPinyin": "dài lán sè hù mù jìng de pàng hǎi ōu fēi guò lái còu rè nao la",
+          "stickers": [
+            { "text": "嘎嘎！🕊️", "style": "pop-mint", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "seagull",
+              "text": "嘎嘎！跟着我飞，前方有最好玩的卷卷浪！",
+              "pinyin": "gā gā gēn zhe wǒ fēi qián fāng yǒu zuì hǎo wán de juǎn juǎn làng",
+              "side": "left"
+            },
+            {
+              "characterId": "pea",
+              "text": "太棒啦！胖海鸥快带路吧！",
+              "pinyin": "tài bàng la pàng hǎi ōu kuài dài lù ba",
+              "side": "right"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 2,
+      "title": "追着白海鸥骑海浪",
+      "titlePinyin": "zhuī zhe bái hǎi ōu qí hǎi làng",
+      "illustration": "books/yanyan-sea-wave-adventure/images/p02-3.webp",
+      "storyParagraphs": [
+        {
+          "text": "浪花像柔软的蓝宝石滑梯托起两块冲浪板，小豌豆和烟烟弯下膝盖稳稳站立，迎着海风欢快向前滑行。",
+          "pinyin": "làng huā xiàng róu ruǎn de lán bǎo shí huá tī tuō qǐ liǎng kuài chōng làng bǎn xiǎo wān dòu hé yān yān wān xià xī gài wěn wěn zhàn lì yíng zhe hǎi fēng huān kuài xiàng qián huá xíng"
+        },
+        {
+          "text": "三只白海鸥贴着浪尖展开翅膀滑翔，两位小骑手追着海鸥大声欢呼，溅起的水花在阳光里化作七彩霓虹！",
+          "pinyin": "sān zhī bái hǎi ōu tiē zhe làng jiān zhǎn kāi chì bǎng huá xiáng liǎng wèi xiǎo qí shǒu zhuī zhe hǎi ōu dà shēng huān hū jiàn qǐ de shuǐ huā zài yáng guāng lǐ huà zuò qī cǎi ní hóng"
+        }
+      ],
+      "comicLayout": "hero-bottom",
+      "panels": [
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p02-1.webp",
+          "caption": "小豌豆和烟烟驾着冲浪板乘风破浪。",
+          "captionPinyin": "xiǎo wān dòu hé yān yān jià zhe chōng làng bǎn chéng fēng pò làng",
+          "stickers": [
+            { "text": "呼——💨", "style": "pop-purple", "pos": "top-right", "rotate": 5 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "yanyan",
+              "text": "哇塞！海风吹在脸上酥酥痒痒的，真自在！",
+              "pinyin": "wā sāi hǎi fēng chuī zài liǎn shàng sū sū yǎng yǎng de zhēn zì zài",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p02-2.webp",
+          "caption": "胖海鸥带着两只小白鸥在前面开心领飞。",
+          "captionPinyin": "pàng hǎi ōu dài zhe liǎng zhī xiǎo bái ōu zài qián miàn kāi xīn lǐng fēi",
+          "stickers": [
+            { "text": "扑棱棱✨", "style": "pop-mint", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "seagull",
+              "text": "大家加速啦！看看谁先追到前面那朵大海浪！",
+              "pinyin": "dà jiā jiā sù la kàn kan shuí xiān zhuī dào qián miàn nà duǒ dà hǎi làng",
+              "side": "right"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p02-3.webp",
+          "caption": "卷卷海浪带着彩虹水雾推着两人向前飞奔！",
+          "captionPinyin": "juǎn juǎn hǎi làng dài zhe cǎi hóng shuǐ wù tuī zhe liǎng rén xiàng qián fēi bēn",
+          "stickers": [
+            { "text": "冲呀！🌊", "style": "pop-gold", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "烟烟快看！浪花里面真的亮起一道小彩虹啦！",
+              "pinyin": "yān yān kuài kàn làng huā lǐ miàn zhēn de liàng qǐ yí dào xiǎo cǎi hóng la",
+              "side": "left"
+            },
+            {
+              "characterId": "yanyan",
+              "text": "哈哈！追着海鸥骑海浪实在太酷啦！",
+              "pinyin": "hā hā zhuī zhe hǎi ōu qí hǎi làng shí zài tài kù la",
+              "side": "right"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 3,
+      "title": "贝壳岛的亮晶晶海星",
+      "titlePinyin": "bèi ké dǎo de liàng jīng jīng hǎi xīng",
+      "illustration": "books/yanyan-sea-wave-adventure/images/p03-1.webp",
+      "storyParagraphs": [
+        {
+          "text": "海浪把两人送到金沙闪闪的贝壳小岛，浅浅的水洼里藏着许多五颜六色的小贝壳和会发光的小海星。",
+          "pinyin": "hǎi làng bǎ liǎng rén sòng dào jīn shā shǎn shǎn de bèi ké xiǎo dǎo qiǎn qiǎn de shuǐ wā lǐ cáng zhe xǔ duō wǔ yán liù sè de xiǎo bèi ké hé huì fā guāng de xiǎo hǎi xīng"
+        },
+        {
+          "text": "烟烟轻轻捧起一只笑眯眯的橘色小海星，这时水花咕噜一响，一只戴草帽的小海龟晃晃悠悠爬上岸来问好。",
+          "pinyin": "yān yān qīng qīng pěng qǐ yì zhī xiào mī mī de jú sè xiǎo hǎi xīng zhè shí shuǐ huā gū lū yì xiǎng yì zhī dài cǎo mào de xiǎo hǎi guī huàng huàng yōu yōu pá shàng àn lái wèn hǎo"
+        }
+      ],
+      "comicLayout": "hero-top",
+      "panels": [
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p03-1.webp",
+          "caption": "阳光水洼里满是闪闪发亮的海星与彩色贝壳。",
+          "captionPinyin": "yáng guāng shuǐ wā lǐ mǎn shì shǎn shǎn fā liàng de hǎi xīng yǔ cǎi sè bèi ké",
+          "stickers": [
+            { "text": "亮晶晶⭐", "style": "pop-gold", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "天哪！水洼里面就像一个大海宝藏箱！",
+              "pinyin": "tiān na shuǐ wā lǐ miàn jiù xiàng yí gè dà hǎi bǎo zàng xiāng",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p03-2.webp",
+          "caption": "烟烟在浅滩捡到一颗爱笑的橘色小海星。",
+          "captionPinyin": "yān yān zài qiǎn tān jiǎn dào yì kē ài xiào de jú sè xiǎo hǎi xīng",
+          "stickers": [
+            { "text": "好萌！🧡", "style": "pop-pink", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "yanyan",
+              "text": "小豌豆快看，这颗小海星正对我们眨眼睛呢！",
+              "pinyin": "xiǎo wān dòu kuài kàn zhè kē xiǎo hǎi xīng zhèng duì wǒ men zhǎ yǎn jing ne",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p03-3.webp",
+          "caption": "戴小草帽的小海龟慢悠悠爬来行个绅士礼。",
+          "captionPinyin": "dài xiǎo cǎo mào de xiǎo hǎi guī màn yōu yōu pá lái xíng ge shēn shì lǐ",
+          "stickers": [
+            { "text": "沙沙～🐢", "style": "pop-mint", "pos": "top-right", "rotate": 7 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "turtle",
+              "text": "呼噜噜……欢迎两位小客人来到贝壳岛玩！",
+              "pinyin": "hū lū lū huān yíng liǎng wèi xiǎo kè rén lái dào bèi ké dǎo wán",
+              "side": "left"
+            },
+            {
+              "characterId": "pea",
+              "text": "小海龟的小草帽真神气呀，一起来吃点心吧！",
+              "pinyin": "xiǎo hǎi guī de xiǎo cǎo mào zhēn shén qì ya yì qǐ lái chī diǎn xin ba",
+              "side": "right"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 4,
+      "title": "浪花里的冰淇淋干杯",
+      "titlePinyin": "làng huā lǐ de bīng qí lín gān bēi",
+      "illustration": "books/yanyan-sea-wave-adventure/images/p04-3.webp",
+      "storyParagraphs": [
+        {
+          "text": "傍晚的云朵变成了香甜的棉花糖色，小豌豆和烟烟支起彩色小阳伞，拿出了草莓和芒果双色甜筒冰淇淋。",
+          "pinyin": "bàng wǎn de yún duǒ biàn chéng le xiāng tián de mián hua táng sè xiǎo wān dòu hé yān yān zhī qǐ cǎi sè xiǎo yáng sǎn ná chū le cǎo méi hé máng guǒ shuāng sè tián tǒng bīng qí lín"
+        },
+        {
+          "text": "胖海鸥和草帽海龟也各叼着一根冰爽水果冰棒凑过来，大家在柔柔的晚霞和海浪声里碰杯欢呼：下次还要一起踏浪玩！",
+          "pinyin": "pàng hǎi ōu hé cǎo mào hǎi guī yě gè diāo zhe yì gēn bīng shuǎng shuǐ guǒ bīng bàng còu guò lái dà jiā zài róu róu de wǎn xiá hé hǎi làng shēng lǐ pèng bēi huān hū xià cì hái yào yì qǐ tà làng wán"
+        }
+      ],
+      "comicLayout": "hero-bottom",
+      "panels": [
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p04-1.webp",
+          "caption": "小豌豆和烟烟坐在小阳伞下碰一碰草莓甜筒！",
+          "captionPinyin": "xiǎo wān dòu hé yān yān zuò zài xiǎo yáng sǎn xià pèng yi pèng cǎo méi tián tǒng",
+          "stickers": [
+            { "text": "冰冰甜🍦", "style": "pop-pink", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "yanyan",
+              "text": "小豌豆，冰冰凉凉的草莓冰淇淋最配海风啦！",
+              "pinyin": "xiǎo wān dòu bīng bīng liáng liáng de cǎo méi bīng qí lín zuì pèi hǎi fēng la",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p04-2.webp",
+          "caption": "胖海鸥和草帽海龟也开心享用果味小冰棒。",
+          "captionPinyin": "pàng hǎi ōu hé cǎo mào hǎi guī yě kāi xīn xiǎng yòng guǒ wèi xiǎo bīng bàng",
+          "stickers": [
+            { "text": "嘎嘣脆😋", "style": "pop-purple", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "turtle",
+              "text": "芒果味的水果冰棒真甜呀，呼噜呼噜～",
+              "pinyin": "máng guǒ wèi de shuǐ guǒ bīng bàng zhēn tián ya hū lū hū lū",
+              "side": "right"
+            }
+          ]
+        },
+        {
+          "image": "books/yanyan-sea-wave-adventure/images/p04-3.webp",
+          "caption": "粉金色的晚霞下，好朋友举起冰淇淋欢呼干杯！",
+          "captionPinyin": "fěn jīn sè de wǎn xiá xià hǎo péng you jǔ qǐ bīng qí lín huān hū gān bēi",
+          "stickers": [
+            { "text": "干杯！🥳", "style": "pop-gold", "pos": "top-right", "rotate": 5 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "今天和烟烟一起踏浪追海鸥太开心啦！干杯！",
+              "pinyin": "jīn tiān hé yān yān yì qǐ tà làng zhuī hǎi ōu tài kāi xīn la gān bēi",
+              "side": "left"
+            },
+            {
+              "characterId": "seagull",
+              "text": "嘎嘎！明天还要飞来和你们比赛追浪花哦！",
+              "pinyin": "gā gā míng tiān hái yào fēi lái hé nǐ men bǐ sài zhuī làng huā o",
+              "side": "right"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

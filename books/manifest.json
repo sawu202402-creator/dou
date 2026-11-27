@@ -1,6 +1,18 @@
 {
   "books": [
     {
+      "id": "yanyan-sea-wave-adventure",
+      "title": "小豌豆和烟烟的踏浪奇遇",
+      "emoji": "🌊",
+      "subtitle": "抱起可爱的贝壳冲浪板，和小豌豆、好朋友烟烟一起踏浪追海鸥、找海星去吧！",
+      "author": "小豌豆 & 魔法画师",
+      "cover": "books/yanyan-sea-wave-adventure/images/cover.webp",
+      "pageCount": 4,
+      "defaultMode": "storybook",
+      "tags": ["冲浪", "大海", "好朋友"],
+      "updatedAt": "2026-11-27T18:13:00+05:30"
+    },
+    {
       "id": "rainbow-sea-adventure",
       "title": "小豌豆和彩虹的海上大冒险",
       "emoji": "🌈",
