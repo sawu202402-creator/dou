@@ -210,6 +210,39 @@ async function cmdPatrol(args) {
     console.log(`🎛️ 网页巡检开关: ${swLabel}${ttlStr} · 电脑哨兵: ${watcherLabel} · 待处理留言: ${Number(data.pendingCount) || 0} 条 (${baseUrl})`);
 }
 
+async function cmdVoiceConfig(args) {
+    const baseUrl = getBaseUrlOrExit(args);
+    const cfg = loadConfig();
+    const adminToken = String(args.token || process.env.MAILBOX_ADMIN_TOKEN || cfg.adminToken || '').trim();
+    const headers = { 'Content-Type': 'application/json' };
+    if (adminToken) {
+        headers.Authorization = `Bearer ${adminToken}`;
+    }
+
+    const payload = {};
+    if (args.provider) payload.provider = String(args.provider).trim();
+    if (args['api-key']) payload.apiKey = String(args['api-key']).trim();
+    if (args['base-url'] !== undefined) payload.baseUrl = String(args['base-url']).trim();
+    if (args.model !== undefined) payload.model = String(args.model).trim();
+    if (args['voice-id'] !== undefined) payload.overrideVoiceId = String(args['voice-id']).trim();
+    if (args.clear) payload.clearApiKey = true;
+
+    const res = await fetch(`${baseUrl}/api/voice-profile/config`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    }
+    const data = await res.json();
+    const p = data.profile || {};
+    console.log(`🎙️ 云端声线克隆配置已更新 (${baseUrl}):`);
+    console.log(`   平台: ${p.providerLabel || p.provider}`);
+    console.log(`   状态: ${p.providerConfigured ? `已激活 (${p.configSource}, Key: ${p.apiKeyMasked || '***'})` : '未配置密钥'}`);
+    console.log(`   原声样本: ${p.hasSample ? `已有第 ${p.version || 1} 版` : '待小豌豆在网页录制'}`);
+}
+
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     const cmd = args._[0] || 'pull';
@@ -249,7 +282,12 @@ async function main() {
         return;
     }
 
-    console.log('支持的命令: set-url | set-token | pull | reply | patrol [status|on|off]');
+    if (cmd === 'voice-config') {
+        await cmdVoiceConfig(args);
+        return;
+    }
+
+    console.log('支持的命令: set-url | set-token | pull | reply | patrol [status|on|off] | voice-config --provider siliconflow --api-key <KEY>');
 }
 
 main().catch((err) => {

@@ -84,7 +84,8 @@ function main() {
         const bookRel = `books/${entry.id}/book.json`;
         const book = readJson(bookRel);
         assert.equal(book.id, entry.id, `${bookRel} 的 id 与 manifest 不一致`);
-        assert.ok(book.artStyleBible && book.artStyleBible.length > 30, `${bookRel} 缺少 artStyleBible`);
+        const bookType = book.bookType === 'notebook' ? 'notebook' : 'picture_comic';
+        assert.ok(bookType === 'notebook' || (book.artStyleBible && book.artStyleBible.length > 30), `${bookRel} 缺少 artStyleBible`);
         assertImageFile(book.cover, `${bookRel}.cover`, referencedImages);
         totalImagesChecked += 1;
 
@@ -109,8 +110,15 @@ function main() {
             assertPinyinAligned(page.title, page.titlePinyin, `${pLabel}.title`);
             totalPinyinChecked += 1;
 
-            assertImageFile(page.illustration, `${pLabel}.illustration`, referencedImages);
-            totalImagesChecked += 1;
+            if (bookType === 'notebook') {
+                if (page.illustration) {
+                    assertImageFile(page.illustration, `${pLabel}.illustration`, referencedImages);
+                    totalImagesChecked += 1;
+                }
+            } else {
+                assertImageFile(page.illustration, `${pLabel}.illustration`, referencedImages);
+                totalImagesChecked += 1;
+            }
 
             assert.ok(Array.isArray(page.storyParagraphs) && page.storyParagraphs.length > 0, `${pLabel}.storyParagraphs 不能为空`);
             page.storyParagraphs.forEach((para, paraIdx) => {
@@ -118,27 +126,49 @@ function main() {
                 totalPinyinChecked += 1;
             });
 
-            assert.ok(validLayouts.has(page.comicLayout), `${pLabel}.comicLayout="${page.comicLayout}" 非法`);
-            assert.ok(Array.isArray(page.panels) && page.panels.length > 0, `${pLabel}.panels 不能为空`);
-
-            page.panels.forEach((panel, panelIdx) => {
-                const panLabel = `${pLabel}.panels[${panelIdx}]`;
-                assertImageFile(panel.image, `${panLabel}.image`, referencedImages);
-                totalImagesChecked += 1;
-
-                if (panel.caption) {
-                    assertPinyinAligned(panel.caption, panel.captionPinyin, `${panLabel}.caption`);
-                    totalPinyinChecked += 1;
-                }
-                assert.ok(Array.isArray(panel.stickers), `${panLabel}.stickers 必须为数组`);
-                assert.ok(Array.isArray(panel.bubbles), `${panLabel}.bubbles 必须为数组`);
-                panel.bubbles.forEach((b, bIdx) => {
-                    const bLabel = `${panLabel}.bubbles[${bIdx}]`;
-                    assert.ok(Object.hasOwn(book.characters, b.characterId), `${bLabel}.characterId="${b.characterId}" 未在 characters 定义`);
-                    assertPinyinAligned(b.text, b.pinyin, bLabel);
+            if (Array.isArray(page.goodWords)) {
+                page.goodWords.forEach((gw, gwIdx) => {
+                    const gwLabel = `${pLabel}.goodWords[${gwIdx}]`;
+                    assert.ok(gw && typeof gw.word === 'string' && gw.word.trim(), `${gwLabel}.word 不能为空`);
+                    assertPinyinAligned(gw.word, gw.pinyin, gwLabel);
+                    assert.ok(typeof gw.meaning === 'string' && gw.meaning.trim(), `${gwLabel}.meaning 不能为空`);
                     totalPinyinChecked += 1;
                 });
-            });
+            }
+
+            if (Array.isArray(page.goodSentences)) {
+                page.goodSentences.forEach((gs, gsIdx) => {
+                    const gsLabel = `${pLabel}.goodSentences[${gsIdx}]`;
+                    assert.ok(gs && typeof gs.text === 'string' && gs.text.trim(), `${gsLabel}.text 不能为空`);
+                    assertPinyinAligned(gs.text, gs.pinyin, gsLabel);
+                    totalPinyinChecked += 1;
+                });
+            }
+
+            const hasPanels = Array.isArray(page.panels) && page.panels.length > 0;
+            if (bookType !== 'notebook' || hasPanels) {
+                assert.ok(validLayouts.has(page.comicLayout), `${pLabel}.comicLayout="${page.comicLayout}" 非法`);
+                assert.ok(hasPanels, `${pLabel}.panels 不能为空`);
+
+                page.panels.forEach((panel, panelIdx) => {
+                    const panLabel = `${pLabel}.panels[${panelIdx}]`;
+                    assertImageFile(panel.image, `${panLabel}.image`, referencedImages);
+                    totalImagesChecked += 1;
+
+                    if (panel.caption) {
+                        assertPinyinAligned(panel.caption, panel.captionPinyin, `${panLabel}.caption`);
+                        totalPinyinChecked += 1;
+                    }
+                    assert.ok(Array.isArray(panel.stickers), `${panLabel}.stickers 必须为数组`);
+                    assert.ok(Array.isArray(panel.bubbles), `${panLabel}.bubbles 必须为数组`);
+                    panel.bubbles.forEach((b, bIdx) => {
+                        const bLabel = `${panLabel}.bubbles[${bIdx}]`;
+                        assert.ok(Object.hasOwn(book.characters, b.characterId), `${bLabel}.characterId="${b.characterId}" 未在 characters 定义`);
+                        assertPinyinAligned(b.text, b.pinyin, bLabel);
+                        totalPinyinChecked += 1;
+                    });
+                });
+            }
         });
 
         const imagesDir = path.join(ROOT, 'books', entry.id, 'images');

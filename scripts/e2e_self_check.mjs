@@ -89,6 +89,8 @@ function startLocalServer() {
         provider: 'siliconflow',
         providerLabel: '硅基流动 SiliconFlow (CosyVoice2)',
         providerConfigured: true,
+        configSource: 'cloud_do',
+        apiKeyMasked: 'sk-t...7890',
         providerVoiceSynced: false,
         overrideVoiceConfigured: false,
         lastError: ''
@@ -183,6 +185,20 @@ function startLocalServer() {
                         enabled: false,
                         providerVoiceSynced: false,
                         cloneReady: false
+                    };
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/voice-profile/config') {
+                    const keyStr = String(body.apiKey || '').trim();
+                    const masked = keyStr ? `${keyStr.slice(0, 4)}...${keyStr.slice(-4)}` : voiceProfile.apiKeyMasked;
+                    voiceProfile = {
+                        ...voiceProfile,
+                        provider: body.provider || voiceProfile.provider,
+                        providerConfigured: Boolean(masked),
+                        configSource: 'cloud_do',
+                        apiKeyMasked: masked
                     };
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
@@ -364,6 +380,7 @@ function startLocalServer() {
                 latestPage: 2,
                 changeType: 'new_page',
                 summary: '热更新自检：第 2 页魔法刷新',
+                silent: false,
                 announcement: '小豌豆！你的第 2 页会唱歌的星星布丁已经热更新好啦！'
             };
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -723,7 +740,44 @@ async function main() {
             return p2;
         })()`);
         assert.equal(dedupeRes.deduped, true, '同一句语音在播放中短时间内重复触发应被去重拦截');
+
+        // 验证 POST /api/voice-profile/config 仅返回脱敏 apiKeyMasked（绝不回传明文秘钥）
+        const cfgResp = await fetch(`${origin}/api/voice-profile/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: 'siliconflow', apiKey: 'sk-test-secret-1234567890' })
+        }).then((r) => r.json());
+        assert.equal(cfgResp.ok, true);
+        assert.equal(cfgResp.profile.apiKeyMasked, 'sk-t...7890');
+        assert.equal(JSON.stringify(cfgResp).includes('1234567890'), false, '配置接口不得明文回传 API Key');
         console.log('✓ [590x820] 「我的声音」录音棚、声线克隆状态与防重复播放机制通过');
+
+        // 验证文字主导型积累本（《小豌豆的中国好文章积累本》：好词宝石盒 + 佳句摘抄栏 + 小配图放大）
+        await evalJs(`document.querySelector('.book-card[data-book-id="chinese-reading-notebook"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'reader' && Boolean(document.querySelector('.notebook-sheet'))`, 4000, 'open chinese-reading-notebook');
+        assert.equal(await evalJs(`document.getElementById('btn-mode-storybook').textContent.trim()`), '📝 积累本', '积累本左上模式按钮应显示为积累本');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '分屏文字积累本存在横向溢出');
+
+        await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.clearCache()`);
+        ttsLog.length = 0;
+        await evalJs(`document.querySelector('.word-gem-card').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`, 3000, 'notebook word gem speak');
+        assert.ok(ttsLog.some((t) => t.text.includes('好词：')), '点击好词卡片应朗读词语与释义');
+
+        await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.clearCache()`);
+        ttsLog.length = 0;
+        await evalJs(`document.querySelector('.sentence-quote-card').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`, 3000, 'notebook sentence quote speak');
+        assert.ok(ttsLog.length >= 1, '点击佳句摘抄卡应触发朗读');
+
+        await evalJs(`document.querySelector('.notebook-thumb-btn').click()`);
+        await waitFor(`document.getElementById('art-lightbox').hidden === false && document.getElementById('art-lightbox-img').complete`, 3000, 'notebook thumb zoom');
+        await evalJs(`document.getElementById('btn-lightbox-close').click()`);
+        await waitFor(`document.getElementById('art-lightbox').hidden === true`, 2000, 'close notebook lightbox');
+        await saveScreenshot(cdp, sessionId, '08-split-notebook.png');
+        await evalJs(`document.getElementById('btn-back-shelf').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'return from notebook to shelf');
+        console.log('✓ [590x820] 文字主导积累本排版（好词宝石盒、佳句摘抄栏、零横向溢出）通过');
 
         // 验证书架上显示阅读进度，点开续读第 3 页，再切换到第 1 页做全页自检
         const shelfProgressText = await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"] .progress-pill')?.textContent || ''`);
@@ -953,7 +1007,14 @@ async function main() {
         await evalJs(`document.getElementById('btn-back-shelf').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'back to shelf final');
 
-        console.log('✓ [1180x820] iPad 横屏全屏全视图、续读进度与模式偏好通过');
+        await evalJs(`document.querySelector('.book-card[data-book-id="chinese-reading-notebook"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'reader' && Boolean(document.querySelector('.notebook-sheet'))`, 4000, 'full open chinese-reading-notebook');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '全屏文字积累本存在横向溢出');
+        await saveScreenshot(cdp, sessionId, '09-full-notebook.png');
+        await evalJs(`document.getElementById('btn-back-shelf').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'back to shelf after notebook');
+
+        console.log('✓ [1180x820] iPad 横屏全屏全视图、积累本排版、续读进度与模式偏好通过');
 
         assert.deepEqual(consoleErrors, [], `Console errors detected: ${consoleErrors.join('; ')}`);
         assert.deepEqual(pageExceptions, [], `Page exceptions detected: ${pageExceptions.join('; ')}`);

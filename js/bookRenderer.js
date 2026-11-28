@@ -16,6 +16,14 @@ export function buildComicBubbleSpeakKey(bookId, pageNumber, panelIdx, bubbleIdx
     return `comic:${bookId}:p${pageNumber}:panel${panelIdx}:b${bubbleIdx}`;
 }
 
+export function buildNotebookWordSpeakKey(bookId, pageNumber, wordIdx) {
+    return `nbword:${bookId}:p${pageNumber}:w${wordIdx}`;
+}
+
+export function buildNotebookSentenceSpeakKey(bookId, pageNumber, sentIdx) {
+    return `nbsent:${bookId}:p${pageNumber}:s${sentIdx}`;
+}
+
 /**
  * 渲染个人专属书架
  */
@@ -57,7 +65,9 @@ export function renderBookshelf(container, books, {
                     <p class="book-card-sub">${escapeHtml(book.subtitle || '')}</p>
                     <div class="book-card-meta">
                         <span class="page-pill">📖 ${pageCount} 页</span>
-                        ${progressHtml || '<span class="mode-pill">绘本 · 漫画</span>'}
+                        ${progressHtml || (book.bookType === 'notebook'
+                            ? '<span class="mode-pill is-notebook">📝 好词佳句本</span>'
+                            : '<span class="mode-pill">绘本 · 漫画</span>')}
                     </div>
                     ${tagsHtml ? `<div class="book-card-tags">${tagsHtml}</div>` : ''}
                 </div>
@@ -212,6 +222,183 @@ export function renderStorybookPage(container, book, page, {
             const para = paragraphs[idx];
             if (para && typeof onSpeakParagraph === 'function') {
                 onSpeakParagraph(para, idx, btn.getAttribute('data-speak-key'));
+            }
+        });
+    });
+}
+
+/**
+ * 模式 ③：文字主导《好文章好词好句积累本》模式（适合散文、童话、日积月累与长期扩充）
+ */
+export function renderNotebookPage(container, book, page, {
+    pageIndex = 0,
+    totalPages = 1,
+    speakingKey = '',
+    onSpeakParagraph,
+    onSpeakPage,
+    onSpeakCustom,
+    onEditPage,
+    onZoomImage
+} = {}) {
+    if (!container || !book || !page) return;
+
+    const paragraphs = page.storyParagraphs || [];
+    const goodWords = Array.isArray(page.goodWords) ? page.goodWords : [];
+    const goodSentences = Array.isArray(page.goodSentences) ? page.goodSentences : [];
+
+    const paraHtml = paragraphs.map((p, idx) => {
+        const key = buildStorySpeakKey(book.id, page.pageNumber, idx);
+        const active = speakingKey === key ? 'is-speaking' : '';
+        return `
+            <button type="button" class="story-para-btn ${active}" data-para-idx="${idx}" data-speak-key="${escapeHtml(key)}">
+                <span class="story-para-text">${renderPinyinHtml(p.text, p.pinyin)}</span>
+                <span class="para-speak-badge" aria-hidden="true">🔊</span>
+            </button>
+        `;
+    }).join('');
+
+    const wordsHtml = goodWords.length > 0
+        ? `
+            <section class="notebook-words-box" aria-label="好词宝石盒">
+                <div class="notebook-subhead">✨ 好词宝石盒 <span class="notebook-subtip">点一点听读音和意思</span></div>
+                <div class="word-gem-grid">
+                    ${goodWords.map((w, idx) => {
+                        const key = buildNotebookWordSpeakKey(book.id, page.pageNumber, idx);
+                        const active = speakingKey === key ? 'is-speaking' : '';
+                        return `
+                            <button type="button" class="word-gem-card ${active}" data-word-idx="${idx}" data-speak-key="${escapeHtml(key)}">
+                                <span class="word-gem-top">
+                                    <span class="word-gem-term">${renderPinyinHtml(w.word, w.pinyin)}</span>
+                                    <span aria-hidden="true">🔊</span>
+                                </span>
+                                <span class="word-gem-meaning">${escapeHtml(w.meaning || '')}</span>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            </section>
+        `
+        : '';
+
+    const sentencesHtml = goodSentences.length > 0
+        ? `
+            <section class="notebook-sentences-box" aria-label="佳句摘抄栏">
+                <div class="notebook-subhead">💛 佳句摘抄栏 <span class="notebook-subtip">写作文可以直接学着这样写！</span></div>
+                <div class="sentence-quote-list">
+                    ${goodSentences.map((s, idx) => {
+                        const key = buildNotebookSentenceSpeakKey(book.id, page.pageNumber, idx);
+                        const active = speakingKey === key ? 'is-speaking' : '';
+                        return `
+                            <button type="button" class="sentence-quote-card ${active}" data-sent-idx="${idx}" data-speak-key="${escapeHtml(key)}">
+                                <div class="sentence-quote-main">
+                                    <span class="sentence-quote-text">${renderPinyinHtml(s.text, s.pinyin)}</span>
+                                    <span class="para-speak-badge" aria-hidden="true">🔊</span>
+                                </div>
+                                ${s.note ? `<span class="sentence-quote-note">💡 ${escapeHtml(s.note)}</span>` : ''}
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            </section>
+        `
+        : '';
+
+    const tipHtml = page.readingTip
+        ? `<div class="notebook-tip-box">📝 <strong>小豌豆写作小秘诀：</strong>${escapeHtml(page.readingTip)}</div>`
+        : '';
+
+    const thumbHtml = page.illustration
+        ? `
+            <button type="button" class="notebook-thumb-btn" data-zoom-src="${escapeHtml(page.illustration)}" data-zoom-caption="${escapeHtml(page.title)}" aria-label="点击放大查看本篇配图">
+                <img src="${escapeHtml(page.illustration)}" alt="${escapeHtml(page.title)}" class="notebook-thumb-img" loading="eager" decoding="async">
+                <span class="notebook-thumb-tag">🔍 看配图</span>
+            </button>
+        `
+        : '';
+
+    container.innerHTML = `
+        <article class="notebook-sheet" data-page-number="${page.pageNumber}">
+            <header class="notebook-header">
+                <div class="notebook-header-main">
+                    <div class="notebook-pills-row">
+                        <span class="chapter-badge">${escapeHtml(book.emoji || '📖')} 第 ${pageIndex + 1} / ${totalPages} 篇</span>
+                        ${page.genre ? `<span class="notebook-genre-pill">${escapeHtml(page.genre)}</span>` : ''}
+                        ${page.articleAuthor ? `<span class="notebook-author-pill">✍️ 作者：${escapeHtml(page.articleAuthor)}</span>` : ''}
+                    </div>
+                    <h2 class="notebook-title">${renderPinyinHtml(page.title, page.titlePinyin)}</h2>
+                    <div class="notebook-header-actions">
+                        <button type="button" class="btn-read-page" id="btn-read-storybook-page">🔊 朗读这一篇</button>
+                        <button type="button" class="btn-edit-page" id="btn-edit-storybook-page">✏️ 改这一页 / 添新篇</button>
+                    </div>
+                </div>
+                ${thumbHtml}
+            </header>
+
+            <div class="storybook-paragraphs notebook-paragraphs">
+                ${paraHtml}
+            </div>
+            ${wordsHtml}
+            ${sentencesHtml}
+            ${tipHtml}
+        </article>
+    `;
+
+    const pageBtn = container.querySelector('#btn-read-storybook-page');
+    const editBtn = container.querySelector('#btn-edit-storybook-page');
+    const thumbBtn = container.querySelector('.notebook-thumb-btn');
+    if (pageBtn && typeof onSpeakPage === 'function') {
+        pageBtn.addEventListener('click', () => onSpeakPage());
+    }
+    if (editBtn && typeof onEditPage === 'function') {
+        editBtn.addEventListener('click', () => onEditPage({
+            scope: 'page',
+            bookId: book.id,
+            bookTitle: book.title,
+            pageNumber: page.pageNumber,
+            mode: 'storybook'
+        }));
+    }
+    if (thumbBtn && typeof onZoomImage === 'function') {
+        thumbBtn.addEventListener('click', () => onZoomImage({
+            src: thumbBtn.getAttribute('data-zoom-src') || '',
+            caption: thumbBtn.getAttribute('data-zoom-caption') || ''
+        }));
+    }
+
+    container.querySelectorAll('.story-para-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const idx = Number(btn.getAttribute('data-para-idx'));
+            const para = paragraphs[idx];
+            if (para && typeof onSpeakParagraph === 'function') {
+                onSpeakParagraph(para, idx, btn.getAttribute('data-speak-key'));
+            }
+        });
+    });
+
+    container.querySelectorAll('.word-gem-card').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const idx = Number(btn.getAttribute('data-word-idx'));
+            const gw = goodWords[idx];
+            if (gw && typeof onSpeakCustom === 'function') {
+                onSpeakCustom({
+                    text: `好词：${gw.word}。${gw.meaning || ''}`,
+                    role: 'narrator',
+                    speakKey: btn.getAttribute('data-speak-key')
+                });
+            }
+        });
+    });
+
+    container.querySelectorAll('.sentence-quote-card').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const idx = Number(btn.getAttribute('data-sent-idx'));
+            const gs = goodSentences[idx];
+            if (gs && typeof onSpeakCustom === 'function') {
+                onSpeakCustom({
+                    text: gs.note ? `${gs.text}。${gs.note}` : gs.text,
+                    role: 'narrator',
+                    speakKey: btn.getAttribute('data-speak-key')
+                });
             }
         });
     });

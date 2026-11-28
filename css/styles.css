@@ -680,6 +680,12 @@ button {
     color: #167A70;
 }
 
+.mode-pill.is-notebook {
+    background: #FFF2D8;
+    color: #8A530B;
+    border: 1.5px solid #F0C46B;
+}
+
 .progress-pill {
     background: #FFF3D6;
     color: #8A530B;
@@ -1486,8 +1492,267 @@ rt.py-rt {
     text-align: center;
 }
 
+/* ==================== 文字主导：好文章好词好句积累本模式 ==================== */
+.notebook-sheet {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: clamp(16px, 2.5vw, 24px);
+    border-radius: 26px;
+    background: linear-gradient(180deg, #FFFDF8 0%, #FFF9ED 100%);
+    border: 3px solid #E2CCA9;
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: pageTurnFade 0.25s ease;
+}
+
+.notebook-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding-bottom: 14px;
+    border-bottom: 2px dashed #E5CFAF;
+}
+
+.notebook-header-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.notebook-pills-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.notebook-genre-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--pink-soft);
+    border: 1.5px solid #FF9EC0;
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #A82252;
+}
+
+.notebook-author-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #E8F8F5;
+    border: 1.5px solid #82DDD0;
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #136B63;
+}
+
+.notebook-title {
+    margin: 0;
+    font-size: clamp(1.22rem, 2.5vw, 1.65rem);
+    font-weight: 900;
+    color: var(--ink-brown);
+    line-height: 1.9;
+}
+
+.notebook-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.notebook-thumb-btn {
+    position: relative;
+    flex: 0 0 auto;
+    width: 112px;
+    padding: 5px;
+    border-radius: 16px;
+    background: #FFFFFF;
+    border: 2px solid #DFC49C;
+    box-shadow: 0 4px 12px rgba(74, 53, 40, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: transform 0.16s ease;
+}
+
+.notebook-thumb-btn:active {
+    transform: scale(0.97);
+}
+
+.notebook-thumb-img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 11px;
+    display: block;
+}
+
+.notebook-thumb-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--ink-soft);
+}
+
+.notebook-paragraphs {
+    gap: 10px;
+}
+
+.notebook-words-box,
+.notebook-sentences-box {
+    padding: 13px 14px;
+    border-radius: 20px;
+    background: #FFFFFF;
+    border: 2px solid #EBDAC2;
+    box-shadow: 0 4px 12px rgba(74, 53, 40, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.notebook-words-box {
+    background: linear-gradient(135deg, #FFFDF5 0%, #FFF7E4 100%);
+    border-color: #F0CA7A;
+}
+
+.notebook-sentences-box {
+    background: linear-gradient(135deg, #FDFBFF 0%, #FFF5FA 100%);
+    border-color: #DFC8F4;
+}
+
+.notebook-subhead {
+    font-size: 0.96rem;
+    font-weight: 900;
+    color: var(--ink-brown);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.notebook-subtip {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+}
+
+.word-gem-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 8px;
+}
+
+.word-gem-card {
+    text-align: left;
+    padding: 9px 11px;
+    border-radius: 15px;
+    background: #FFFFFF;
+    border: 2px solid #F3D492;
+    box-shadow: 0 2px 6px rgba(176, 128, 36, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: transform 0.14s ease, border-color 0.16s ease;
+}
+
+.word-gem-card:active {
+    transform: scale(0.98);
+}
+
+.word-gem-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.word-gem-term {
+    font-size: 1.02rem;
+    font-weight: 900;
+    color: #5C3A16;
+    line-height: 1.9;
+}
+
+.word-gem-meaning {
+    font-size: 0.79rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    line-height: 1.42;
+}
+
+.sentence-quote-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sentence-quote-card {
+    text-align: left;
+    padding: 11px 13px;
+    border-radius: 16px;
+    background: #FFFFFF;
+    border: 2px solid #DEC8F6;
+    border-left: 6px solid #8A6AE2;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    transition: transform 0.14s ease, border-color 0.16s ease;
+}
+
+.sentence-quote-card:active {
+    transform: scale(0.99);
+}
+
+.sentence-quote-main {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.sentence-quote-text {
+    font-size: clamp(0.98rem, 1.8vw, 1.12rem);
+    font-weight: 800;
+    color: var(--ink-brown);
+    line-height: 2.05;
+}
+
+.sentence-quote-note {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #5C4B99;
+    line-height: 1.45;
+}
+
+.notebook-tip-box {
+    padding: 10px 13px;
+    border-radius: 15px;
+    background: #E8FBF7;
+    border: 1.5px solid #8CDFD3;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #135E57;
+    line-height: 1.5;
+}
+
 /* ==================== iPad 590px 分屏细节调优 ==================== */
 @media (max-width: 680px) {
+    .notebook-sheet {
+        padding: 12px;
+        gap: 12px;
+    }
+    .notebook-thumb-btn {
+        width: 82px;
+    }
+    .word-gem-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     .topbar {
         padding: 8px 10px;
         gap: 6px;

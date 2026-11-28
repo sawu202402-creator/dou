@@ -161,6 +161,8 @@ export class VoiceStudioController {
             provider: 'siliconflow',
             providerLabel: '硅基流动 SiliconFlow (CosyVoice2)',
             providerConfigured: false,
+            configSource: 'none',
+            apiKeyMasked: '',
             providerVoiceSynced: false,
             overrideVoiceConfigured: false,
             lastError: ''
@@ -509,14 +511,17 @@ export class VoiceStudioController {
         }
 
         if (this.dom.parentGuide) {
+            const keyInfo = p.providerConfigured
+                ? `✅ 已检测到 <strong>${escapeHtml(p.provider)}</strong> 密钥${p.apiKeyMasked ? `（<code>${escapeHtml(p.apiKeyMasked)}</code> · ${p.configSource === 'cloud_do' ? '云端 Durable Object 加密配置' : 'Cloudflare Secret'}）` : ''}`
+                : '⏳ 暂未配置 VOICE_CLONE_API_KEY（样本仍可提前录好存进云端 DO）';
             this.dom.parentGuide.innerHTML = `
-                <p>在 Cloudflare Dashboard → Workers & Pages → <strong>pea-story-house</strong> → Settings → Variables &amp; Secrets 添加以下两项（推荐从上到下任选一家，修改后无需改代码）：</p>
+                <p>可在 Cloudflare Dashboard → Workers & Pages → <strong>pea-story-house</strong> → Settings → Variables &amp; Secrets 添加以下变量，或通过本地 <code>mailbox_cli.mjs voice-config</code> 安全写入云端配置：</p>
                 <div class="vs-env-table">
                     <div><code>VOICE_CLONE_PROVIDER</code> = <code>siliconflow</code> | <code>minimax</code> | <code>fishaudio</code>（默认 <code>siliconflow</code>）</div>
-                    <div><code>VOICE_CLONE_API_KEY</code> = 对应平台密钥（使用 Secret 加密保存）</div>
+                    <div><code>VOICE_CLONE_API_KEY</code> = 对应平台密钥（仅保存在云端，从不下发前端）</div>
                     <div>可选：<code>VOICE_CLONE_MODEL</code>、<code>VOICE_CLONE_BASE_URL</code>、<code>VOICE_CLONE_VOICE_ID</code></div>
                 </div>
-                <p class="vs-parent-note">当前服务器状态：${p.providerConfigured ? `✅ 已检测到 <strong>${escapeHtml(p.provider)}</strong> 密钥` : '⏳ 暂未配置 VOICE_CLONE_API_KEY（样本仍可提前录好存进云端 DO）'}</p>
+                <p class="vs-parent-note">当前服务器状态：${keyInfo}</p>
             `;
         }
     }

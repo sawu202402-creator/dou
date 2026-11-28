@@ -1,10 +1,9 @@
 {
-  "version": "2026.11.28.003",
-  "updatedAt": "2026-11-28T12:46:40+05:30",
+  "version": "2026.11.28.004",
+  "updatedAt": "2026-11-28T12:56:00+05:30",
   "latestBookId": "chinese-reading-notebook",
-  "latestPage": 5,
-  "changeType": "new_page",
-  "summary": "为《小豌豆的中国好文章积累本》新增 3 篇中国名家童话（第 5~7 页）",
-  "silent": false,
-  "announcement": "小豌豆！你的中国积累本新添了《小溪流的歌》《神笔马良》和《盲孩子和他的影子》三篇童话，快翻到第5页看好词好句吧！"
+  "latestPage": 1,
+  "changeType": "updated_book",
+  "summary": "升级积累本为文字主导排版（好词宝石盒+佳句摘抄栏）并支持云端硅基流动声线密钥配置",
+  "silent": true
 }

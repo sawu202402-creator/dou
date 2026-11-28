@@ -2,6 +2,7 @@
   "books": [
     {
       "id": "chinese-reading-notebook",
+      "bookType": "notebook",
       "title": "小豌豆的中国好文章积累本",
       "emoji": "📖",
       "subtitle": "收录中国名家的优美散文与童话故事，标明篇名作者与好词好句，还能一直往后添新篇哦！",

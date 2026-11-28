@@ -1,5 +1,6 @@
 {
   "id": "chinese-reading-notebook",
+  "bookType": "notebook",
   "title": "小豌豆的中国好文章积累本",
   "titlePinyin": "xiǎo wān dòu de zhōng guó hǎo wén zhāng jī lěi běn",
   "emoji": "📖",
@@ -70,7 +71,29 @@
       "pageNumber": 1,
       "title": "《春》· 朱自清",
       "titlePinyin": "chūn zhū zì qīng",
+      "articleTitle": "春",
+      "articleAuthor": "朱自清",
+      "genre": "🌸 经典散文",
       "illustration": "books/chinese-reading-notebook/images/p01-1.webp",
+      "goodWords": [
+        { "word": "欣欣然", "pinyin": "xīn xīn rán", "meaning": "草木刚睡醒、欢喜又有生气的样子" },
+        { "word": "赶趟儿", "pinyin": "gǎn tàng er", "meaning": "争着抢着凑热闹、接连开出花来" },
+        { "word": "嗡嗡地闹着", "pinyin": "wēng wēng de nào zhe", "meaning": "小蜜蜂忙忙碌碌、热热闹闹飞舞" },
+        { "word": "盼望着", "pinyin": "pàn wàng zhe", "meaning": "心里特别期待、盼着好事快点来" }
+      ],
+      "goodSentences": [
+        {
+          "text": "红的像火，粉的像霞，白的像雪。",
+          "pinyin": "hóng de xiàng huǒ fěn de xiàng xiá bái de xiàng xuě",
+          "note": "用三个“像……”排比加比喻，把春花的颜色写得亮晶晶的！"
+        },
+        {
+          "text": "一切都像刚睡醒的样子，欣欣然张开了眼。",
+          "pinyin": "yí qiè dōu xiàng gāng shuì xǐng de yàng zi xīn xīn rán zhāng kāi le yǎn",
+          "note": "把春天的山水草木写成刚睡醒的小朋友，读起来真温柔！"
+        }
+      ],
+      "readingTip": "写春天的花朵时，试试用“红的像火，粉的像霞，白的像雪”这样连用三个比喻句！",
       "storyParagraphs": [
         {
           "text": "【篇名：《春》｜作者：朱自清】盼望着，盼望着，东风来了，春天的脚步近了。一切都像刚睡醒的样子，欣欣然张开了眼。",
@@ -147,7 +170,24 @@
       "pageNumber": 2,
       "title": "《祖父的园子》· 萧红",
       "titlePinyin": "zǔ fù de yuán zi xiāo hóng",
+      "articleTitle": "祖父的园子",
+      "articleAuthor": "萧红",
+      "genre": "🦋 经典散文",
       "illustration": "books/chinese-reading-notebook/images/p02-2.webp",
+      "goodWords": [
+        { "word": "明晃晃", "pinyin": "míng huǎng huǎng", "meaning": "阳光照在花园里亮晶晶、特别透亮" },
+        { "word": "胖圆圆", "pinyin": "pàng yuán yuán", "meaning": "浑身毛茸茸、圆滚滚的可爱模样" },
+        { "word": "小毛球似的", "pinyin": "xiǎo máo qiú shì de", "meaning": "像一颗软乎乎小毛球（注意读 shì）" },
+        { "word": "新鲜漂亮", "pinyin": "xīn xiān piào liang", "meaning": "花朵和绿叶刚刚绽开、水灵又好看" }
+      ],
+      "goodSentences": [
+        {
+          "text": "蜂子则嗡嗡地飞着，满身绒毛，落到一朵花上，胖圆圆的就和一个小毛球似的不动了。",
+          "pinyin": "fēng zi zé wēng wēng de fēi zhe mǎn shēn róng máo luò dào yì duǒ huā shàng pàng yuán yuán de jiù hé yí gè xiǎo máo qiú shì de bú dòng le",
+          "note": "抓住了“满身绒毛、胖圆圆、小毛球似的”细节，小蜜蜂一下活起来啦！"
+        }
+      ],
+      "readingTip": "观察小昆虫时多写一写它的颜色和形状，比如“满身带着金粉”就特别传神！",
       "storyParagraphs": [
         {
           "text": "【篇名：《祖父的园子》｜作者：萧红】我家有一个大花园，这花园里蜂子、蝴蝶、蜻蜓、蚂蚱，样样都有。",
@@ -218,7 +258,24 @@
       "pageNumber": 3,
       "title": "《猫》· 老舍",
       "titlePinyin": "māo lǎo shě",
+      "articleTitle": "猫",
+      "articleAuthor": "老舍",
+      "genre": "🐱 经典散文",
       "illustration": "books/chinese-reading-notebook/images/p03-1.webp",
+      "goodWords": [
+        { "word": "无忧无虑", "pinyin": "wú yōu wú lǜ", "meaning": "一点烦恼也没有，安安静静享福" },
+        { "word": "屏息凝视", "pinyin": "bǐng xī níng shì", "meaning": "连大气都不敢出，盯得特别专心" },
+        { "word": "温柔可亲", "pinyin": "wēn róu kě qīn", "meaning": "脾气温和善良，让人特别想抱抱它" },
+        { "word": "几朵小梅花", "pinyin": "jǐ duǒ xiǎo méi huā", "meaning": "把小猫爪印比作梅花，充满喜爱之情" }
+      ],
+      "goodSentences": [
+        {
+          "text": "它要是高兴，能比谁都温柔可亲：用身子蹭你的腿，或是在写作时跳上桌来，在稿纸上踩印几朵小梅花。",
+          "pinyin": "tā yào shi gāo xìng néng bǐ shuí dōu wēn róu kě qīn yòng shēn zi cèng nǐ de tuǐ huò shì zài xiě zuò shí tiào shàng zhuō lái zài gǎo zhǐ shàng cǎi yìn jǐ duǒ xiǎo méi huā",
+          "note": "不嫌小猫踩脏稿纸，反而夸成“小梅花”，太有爱心啦！"
+        }
+      ],
+      "readingTip": "写家里的小动物时，先写它爱睡懒觉、再写它尽职干活，性格一下子更立体！",
       "storyParagraphs": [
         {
           "text": "【篇名：《猫》｜作者：老舍】猫的性格实在有些古怪。说它老实吧，它的确有时候很乖，找个暖和的地方成天睡大觉，无忧无虑。",
@@ -289,7 +346,24 @@
       "pageNumber": 4,
       "title": "《白鹅》· 丰子恺",
       "titlePinyin": "bái é fēng zǐ kǎi",
+      "articleTitle": "白鹅",
+      "articleAuthor": "丰子恺",
+      "genre": "🎭 经典散文",
       "illustration": "books/chinese-reading-notebook/images/p04-3.webp",
+      "goodWords": [
+        { "word": "局促不安", "pinyin": "jú cù bù ān", "meaning": "走路急匆匆、有点紧张慌乱的样子" },
+        { "word": "从容", "pinyin": "cóng róng", "meaning": "不慌不忙、特别稳重淡定" },
+        { "word": "大模大样", "pinyin": "dà mú dà yàng", "meaning": "昂首挺胸、傲气十足地踱方步" },
+        { "word": "毫不相让", "pinyin": "háo bù xiāng ràng", "meaning": "站在路当中一点也不往旁边躲" }
+      ],
+      "goodSentences": [
+        {
+          "text": "鹅的步调从容，大模大样的，颇像京剧里的净角出场。",
+          "pinyin": "é de bù diào cóng róng dà mú dà yàng de pō xiàng jīng jù lǐ de jìng jué chū chǎng",
+          "note": "先写鸭子小步快跑作对比，再拿京剧角色比喻大白鹅，画面立刻神气极了！"
+        }
+      ],
+      "readingTip": "想突出主角的特点，可以先写另一个小伙伴完全相反的样子来做“对比”！",
       "storyParagraphs": [
         {
           "text": "【篇名：《白鹅》｜作者：丰子恺】鹅的步态，更是傲慢了。大体上与鸭相似，但鸭的步调急速，有局促不安之相。",
@@ -366,7 +440,24 @@
       "pageNumber": 5,
       "title": "《小溪流的歌》· 严文井",
       "titlePinyin": "xiǎo xī liú de gē yán wén jǐng",
+      "articleTitle": "小溪流的歌",
+      "articleAuthor": "严文井",
+      "genre": "💧 名家童话",
       "illustration": "books/chinese-reading-notebook/images/p05-1.webp",
+      "goodWords": [
+        { "word": "哼哼唱唱", "pinyin": "hēng hēng chàng chàng", "meaning": "一路轻快地哼着歌，心情真开心" },
+        { "word": "五颜六色", "pinyin": "wǔ yán liù sè", "meaning": "红黄蓝绿等各种色彩聚在一起" },
+        { "word": "清脆", "pinyin": "qīng cuì", "meaning": "声音又清亮又悦耳，像小银铃一样" },
+        { "word": "不知疲倦", "pinyin": "bù zhī pí juàn", "meaning": "一直向前奔跑，永远充满干劲不喊累" }
+      ],
+      "goodSentences": [
+        {
+          "text": "他一会儿拍拍岸边五颜六色的石卵，一会儿摸摸沙地上才伸出脑袋来的小草，一会儿让漂浮的小树叶打个转儿，一会儿挠挠追赶他的小蝌蚪的痒痒。",
+          "pinyin": "tā yí huì er pāi pāi àn biān wǔ yán liù sè de shí luǎn yí huì er mō mō shā dì shàng cái shēn chū nǎo dai lái de xiǎo cǎo yí huì er ràng piāo fú de xiǎo shù yè dǎ gè zhuàn er yí huì er náo náo zhuī gǎn tā de xiǎo kē dǒu de yǎng yang",
+          "note": "连用四个“一会儿……”，把溪水写成爱调皮玩耍的孩子，动词太生动了！"
+        }
+      ],
+      "readingTip": "写大自然景物时，给它加上“拍拍、摸摸、打招呼”等人动作，文章马上变成美童话！",
       "storyParagraphs": [
         {
           "text": "【篇名：《小溪流的歌》｜作者：严文井】一条快活的小溪流哼哼唱唱、不分日夜地向前奔流。太阳出来了，太阳向着他微笑；月亮出来了，月亮也向着他微笑。",
@@ -443,7 +534,24 @@
       "pageNumber": 6,
       "title": "《神笔马良》· 洪汛涛",
       "titlePinyin": "shén bǐ mǎ liáng hóng xùn tāo",
+      "articleTitle": "神笔马良",
+      "articleAuthor": "洪汛涛",
+      "genre": "🖌️ 名家童话",
       "illustration": "books/chinese-reading-notebook/images/p06-2.webp",
+      "goodWords": [
+        { "word": "孜孜不倦", "pinyin": "zī zī bú juàn", "meaning": "非常勤奋认真的学习，一点也不嫌累" },
+        { "word": "层层叠叠", "pinyin": "céng céng dié dié", "meaning": "一层叠着一层，说明练习得超级多" },
+        { "word": "金光灿灿", "pinyin": "jīn guāng càn càn", "meaning": "闪着温暖耀眼金色光芒的样子" },
+        { "word": "持之以恒", "pinyin": "chí zhī yǐ héng", "meaning": "喜爱一件事就坚持到底、不半途而废" }
+      ],
+      "goodSentences": [
+        {
+          "text": "画出的鸟就差不会叫了，画出的鱼就差不会游了。",
+          "pinyin": "huà chū de niǎo jiù chà bú huì jiào le huà chū de yú jiù chà bú huì yóu le",
+          "note": "不说“画得特别好看”，而说“差不会叫、不会游”，夸张得活灵活现！"
+        }
+      ],
+      "readingTip": "赞美画或字写得棒时，学会用“就差会动会叫啦”这样的夸张比喻句！",
       "storyParagraphs": [
         {
           "text": "【篇名：《神笔马良》｜作者：洪汛涛】马良喜爱画画，上山打柴捡树枝在沙地描飞鸟，河边割草用草根蘸河水在岸石描游鱼。",
@@ -514,7 +622,24 @@
       "pageNumber": 7,
       "title": "《盲孩子和他的影子》· 金波",
       "titlePinyin": "máng hái zi hé tā de yǐng zi jīn bō",
+      "articleTitle": "盲孩子和他的影子",
+      "articleAuthor": "金波",
+      "genre": "✨ 名家童话",
       "illustration": "books/chinese-reading-notebook/images/p07-3.webp",
+      "goodWords": [
+        { "word": "痒酥酥", "pinyin": "yǎng sū sū", "meaning": "轻轻碰在手心里又软又暖、痒痒的感觉" },
+        { "word": "幽蓝", "pinyin": "yōu lán", "meaning": "像夏夜晴空一样温柔静谧的蓝光" },
+        { "word": "翠绿", "pinyin": "cuì lǜ", "meaning": "像翡翠和新叶一样鲜亮透澈的绿光" },
+        { "word": "明亮的露珠", "pinyin": "míng liàng de lù zhū", "meaning": "晨光里挂在草尖上的晶莹小水珠" }
+      ],
+      "goodSentences": [
+        {
+          "text": "月亮和太阳同时挂在天上，天边出现弯弯的彩虹，还有五颜六色的花朵和草叶上明亮的露珠！",
+          "pinyin": "yuè liang hé tài yáng tóng shí guà zài tiān shàng tiān biān chū xiàn wān wān de cǎi hóng hái yǒu wǔ yán liù sè de huā duǒ hé cǎo yè shàng míng liàng de lù zhū",
+          "note": "先写黑夜里的萤火虫微光，再到阳光彩虹齐现的惊喜，整段读起来诗意满满！"
+        }
+      ],
+      "readingTip": "多收集“痒酥酥、暖洋洋、绿油油”这类 ABB 式叠词，写进作文立刻像诗一样美！",
       "storyParagraphs": [
         {
           "text": "【篇名：《盲孩子和他的影子》｜作者：金波】一个淡淡的光点在盲孩子手心移动，痒酥酥的。无数萤火虫组合成明亮的灯，闪着幽蓝和翠绿的光。",

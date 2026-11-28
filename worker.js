@@ -485,9 +485,20 @@ export class StoryMailboxDO extends DurableObject {
         return rows[0] || null;
     }
 
+    _getEffectiveVoiceCloneConfig() {
+        const stored = {
+            provider: this._getSetting("voice_clone_provider", "").value,
+            apiKey: this._getSetting("voice_clone_api_key", "").value,
+            baseUrl: this._getSetting("voice_clone_base_url", "").value,
+            model: this._getSetting("voice_clone_model", "").value,
+            overrideVoiceId: this._getSetting("voice_clone_voice_id", "").value
+        };
+        return getVoiceCloneConfig(this.env, stored);
+    }
+
     _formatPublicVoiceProfile(row, role = "pea") {
         const cleanRole = sanitizeVoiceRole(role);
-        const vc = getVoiceCloneConfig(this.env);
+        const vc = this._getEffectiveVoiceCloneConfig();
         const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
         const enabled = row ? Number(row.enabled) !== 0 : Boolean(vc.overrideVoiceId);
         const providerVoiceSynced = Boolean(
@@ -509,6 +520,8 @@ export class StoryMailboxDO extends DurableObject {
             provider: vc.provider,
             providerLabel: vc.providerLabel,
             providerConfigured: vc.configured,
+            configSource: vc.configSource,
+            apiKeyMasked: vc.apiKeyMasked,
             providerVoiceSynced,
             overrideVoiceConfigured: Boolean(vc.overrideVoiceId),
             lastError: row ? cleanStr(row.last_error, 260) : ""
@@ -948,7 +961,7 @@ export class StoryMailboxDO extends DurableObject {
                         return jsonResponse({ ok: false, error: "forbidden" }, 403);
                     }
                     const row = this._getVoiceProfileRow(role);
-                    const vc = getVoiceCloneConfig(this.env);
+                    const vc = this._getEffectiveVoiceCloneConfig();
                     const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
                     const enabled = row ? Number(row.enabled) !== 0 : Boolean(vc.overrideVoiceId);
                     return jsonResponse({
@@ -961,8 +974,64 @@ export class StoryMailboxDO extends DurableObject {
                         enabled: (hasSample || Boolean(vc.overrideVoiceId)) ? enabled : false,
                         version: row ? Number(row.version) || 1 : 0,
                         provider: row ? cleanStr(row.provider, 40) : "",
-                        providerVoiceId: row ? cleanStr(row.provider_voice_id, 260) : ""
+                        providerVoiceId: row ? cleanStr(row.provider_voice_id, 260) : "",
+                        effectiveConfig: vc
                     });
+                }
+
+                if (request.method === "POST" && path === "/api/voice-profile/config") {
+                    if (!isAdminAuthorized(request, this.env)) {
+                        return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+                    }
+                    const body = await request.json().catch(() => ({}));
+                    const now = Date.now();
+                    if (typeof body.provider === "string") {
+                        this._setSetting("voice_clone_provider", cleanStr(body.provider, 40), now);
+                    }
+                    if (body.clearApiKey === true) {
+                        this._setSetting("voice_clone_api_key", "", now);
+                    } else if (typeof body.apiKey === "string" && body.apiKey.trim()) {
+                        this._setSetting("voice_clone_api_key", cleanStr(body.apiKey, 400), now);
+                    }
+                    if (typeof body.baseUrl === "string") {
+                        this._setSetting("voice_clone_base_url", cleanStr(body.baseUrl, 260), now);
+                    }
+                    if (typeof body.model === "string") {
+                        this._setSetting("voice_clone_model", cleanStr(body.model, 120), now);
+                    }
+                    if (typeof body.overrideVoiceId === "string") {
+                        this._setSetting("voice_clone_voice_id", cleanStr(body.overrideVoiceId, 240), now);
+                    }
+
+                    const vc = this._getEffectiveVoiceCloneConfig();
+                    const row = this._getVoiceProfileRow("pea");
+                    const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
+                    if (vc.configured && hasSample) {
+                        try {
+                            const providerVoiceId = await enrollClonedVoice(vc, {
+                                sampleAudioB64: row.sample_audio_b64,
+                                sampleMime: row.sample_mime || "audio/wav",
+                                sampleText: row.sample_text || "",
+                                version: Number(row.version) || 1
+                            });
+                            this._updateVoiceSyncMetadata("pea", {
+                                provider: vc.provider,
+                                providerVoiceId,
+                                syncedAt: Date.now(),
+                                lastError: ""
+                            });
+                        } catch (err) {
+                            this._updateVoiceSyncMetadata("pea", {
+                                provider: vc.provider,
+                                providerVoiceId: "",
+                                syncedAt: 0,
+                                lastError: err?.message || String(err)
+                            });
+                        }
+                    }
+
+                    const updatedRow = this._getVoiceProfileRow("pea");
+                    return jsonResponse({ ok: true, profile: this._formatPublicVoiceProfile(updatedRow, "pea") });
                 }
 
                 if (request.method === "POST" && path === "/api/voice-profile/internal-sync") {
@@ -1015,7 +1084,7 @@ export class StoryMailboxDO extends DurableObject {
                         targetRole, rawB64, sampleMime, sampleText, durationMs, nextVersion, now, updatedStr
                     );
 
-                    const vc = getVoiceCloneConfig(this.env);
+                    const vc = this._getEffectiveVoiceCloneConfig();
                     if (vc.configured) {
                         try {
                             const providerVoiceId = await enrollClonedVoice(vc, {
@@ -1050,7 +1119,7 @@ export class StoryMailboxDO extends DurableObject {
                         return jsonResponse({ ok: false, error: "invalid_enabled" }, 400);
                     }
                     const targetRole = sanitizeVoiceRole(body.role || role);
-                    const vc = getVoiceCloneConfig(this.env);
+                    const vc = this._getEffectiveVoiceCloneConfig();
                     const prev = this._getVoiceProfileRow(targetRole);
                     const now = Date.now();
                     const updatedStr = formatBeijingTimeStr(now);
@@ -1088,7 +1157,7 @@ export class StoryMailboxDO extends DurableObject {
                     const targetRole = sanitizeVoiceRole(body.role || role);
                     const cleanText = stripSpeechTextForTts(cleanStr(body.text, 240)) || "大家好，我是小豌豆！现在每一本故事书里都是我自己的声音啦！";
                     const row = this._getVoiceProfileRow(targetRole);
-                    const vc = getVoiceCloneConfig(this.env);
+                    const vc = this._getEffectiveVoiceCloneConfig();
                     const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
 
                     if (!hasSample && !vc.overrideVoiceId) {
@@ -1191,7 +1260,23 @@ export default {
         }
 
         if (url.pathname === "/api/health" && request.method === "GET") {
-            const vc = getVoiceCloneConfig(env);
+            let vc = getVoiceCloneConfig(env);
+            if (env && env.STORY_MAILBOX) {
+                try {
+                    const id = env.STORY_MAILBOX.idFromName("pea-story-house-mailbox-v1");
+                    const stub = env.STORY_MAILBOX.get(id);
+                    const vpRes = await stub.fetch("https://mailbox.internal/api/voice-profile?role=pea");
+                    const vpData = vpRes.ok ? await vpRes.json().catch(() => null) : null;
+                    if (vpData?.ok && vpData.profile) {
+                        vc = {
+                            configured: Boolean(vpData.profile.providerConfigured),
+                            provider: vpData.profile.provider,
+                            providerLabel: vpData.profile.providerLabel,
+                            configSource: vpData.profile.configSource || "none"
+                        };
+                    }
+                } catch (_) {}
+            }
             return jsonResponse({
                 ok: true,
                 service: "pea-story-house",
@@ -1199,9 +1284,10 @@ export default {
                 ai: Boolean(env?.AI),
                 mailbox: Boolean(env?.STORY_MAILBOX),
                 voiceClone: {
-                    configured: vc.configured,
+                    configured: Boolean(vc.configured),
                     provider: vc.provider,
-                    providerLabel: vc.providerLabel
+                    providerLabel: vc.providerLabel,
+                    configSource: vc.configSource || "none"
                 }
             });
         }
@@ -1218,9 +1304,9 @@ export default {
                     }
 
                     const edgeCache = typeof caches !== "undefined" ? caches.default : null;
-                    const vcCfg = role === "pea" ? getVoiceCloneConfig(env) : null;
+                    let activeVcProvider = "";
 
-                    if (role === "pea" && vcCfg && vcCfg.configured && env?.STORY_MAILBOX) {
+                    if (role === "pea" && env?.STORY_MAILBOX) {
                         try {
                             const id = env.STORY_MAILBOX.idFromName("pea-story-house-mailbox-v1");
                             const stub = env.STORY_MAILBOX.get(id);
@@ -1228,8 +1314,10 @@ export default {
                                 headers: { "X-Internal-Worker": "pea-internal" }
                             });
                             const rawProfile = rawRes.ok ? await rawRes.json().catch(() => null) : null;
+                            const vcCfg = rawProfile?.effectiveConfig || getVoiceCloneConfig(env);
+                            activeVcProvider = vcCfg?.provider || "";
 
-                            if (rawProfile && rawProfile.ok && rawProfile.enabled && (rawProfile.hasSample || vcCfg.overrideVoiceId)) {
+                            if (vcCfg && vcCfg.configured && rawProfile && rawProfile.ok && rawProfile.enabled && (rawProfile.hasSample || vcCfg.overrideVoiceId)) {
                                 const cloneHash = await sha256Hex(JSON.stringify({
                                     v: 2,
                                     source: "clone",
@@ -1324,7 +1412,7 @@ export default {
                                     },
                                     body: JSON.stringify({
                                         role: "pea",
-                                        provider: vcCfg.provider,
+                                        provider: activeVcProvider || "siliconflow",
                                         lastError: cloneErr?.message || String(cloneErr)
                                     })
                                 }).catch(() => {});

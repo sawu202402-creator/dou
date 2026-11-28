@@ -81,17 +81,32 @@ function normalizeProviderId(raw) {
     return SUPPORTED_PROVIDERS[s] ? s : "siliconflow";
 }
 
-export function getVoiceCloneConfig(env = {}) {
-    const provider = normalizeProviderId(env?.VOICE_CLONE_PROVIDER);
+export function maskApiKey(key = "") {
+    const clean = cleanStr(key, 400);
+    if (!clean) return "";
+    if (clean.length <= 10) return `${clean.slice(0, 2)}***${clean.slice(-2)}`;
+    return `${clean.slice(0, 4)}...${clean.slice(-4)}`;
+}
+
+export function getVoiceCloneConfig(env = {}, stored = null) {
+    const storedMap = stored && typeof stored === "object" ? stored : {};
+    const envApiKey = cleanStr(env?.VOICE_CLONE_API_KEY, 400);
+    const storedApiKey = cleanStr(storedMap.apiKey, 400);
+    const apiKey = envApiKey || storedApiKey;
+    const configSource = envApiKey ? "env" : (storedApiKey ? "cloud_do" : "none");
+
+    const rawProvider = cleanStr(env?.VOICE_CLONE_PROVIDER, 40) || cleanStr(storedMap.provider, 40);
+    const provider = normalizeProviderId(rawProvider);
     const spec = SUPPORTED_PROVIDERS[provider] || SUPPORTED_PROVIDERS.siliconflow;
-    const apiKey = cleanStr(env?.VOICE_CLONE_API_KEY, 400);
-    const rawBase = cleanStr(env?.VOICE_CLONE_BASE_URL, 260).replace(/\/+$/, "");
+    const rawBase = (cleanStr(env?.VOICE_CLONE_BASE_URL, 260) || cleanStr(storedMap.baseUrl, 260)).replace(/\/+$/, "");
     const baseUrl = rawBase || spec.defaultBaseUrl;
-    const model = cleanStr(env?.VOICE_CLONE_MODEL, 120) || spec.defaultModel;
-    const overrideVoiceId = cleanStr(env?.VOICE_CLONE_VOICE_ID, 240);
+    const model = cleanStr(env?.VOICE_CLONE_MODEL, 120) || cleanStr(storedMap.model, 120) || spec.defaultModel;
+    const overrideVoiceId = cleanStr(env?.VOICE_CLONE_VOICE_ID, 240) || cleanStr(storedMap.overrideVoiceId, 240);
 
     return {
         configured: Boolean(apiKey),
+        configSource,
+        apiKeyMasked: maskApiKey(apiKey),
         provider,
         providerLabel: spec.label,
         apiKey,
@@ -163,7 +178,7 @@ export async function enrollClonedVoice(cfg, {
             },
             body: JSON.stringify({
                 model: cfg.model,
-                customName: `pea_voice_v${verNum}`,
+                customName: `pea_voice_v${verNum}_${Date.now().toString(36).slice(-4)}`,
                 audio: `data:${safeMime};base64,${cleanB64}`,
                 text: transcript
             })

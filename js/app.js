@@ -11,6 +11,7 @@ import { VoiceStudioController } from './voiceStudio.js';
 import {
     renderBookshelf,
     renderStorybookPage,
+    renderNotebookPage,
     renderComicPage,
     buildStorySpeakKey,
     buildComicCaptionSpeakKey,
@@ -288,14 +289,23 @@ function closeArtLightbox() {
     if (artLightboxImgEl) artLightboxImgEl.removeAttribute('src');
 }
 
+function bookHasComicPanels(book) {
+    return Boolean(
+        book &&
+        Array.isArray(book.pages) &&
+        book.pages.some((p) => Array.isArray(p?.panels) && p.panels.length > 0)
+    );
+}
+
 function syncChrome() {
     appEl.setAttribute('data-view', state.view);
     appEl.setAttribute('data-mode', state.mode);
     appEl.setAttribute('data-pinyin', state.pinyinOn ? 'on' : 'off');
 
     const inReader = state.view === 'reader' && Boolean(state.currentBook);
+    const hasComic = bookHasComicPanels(state.currentBook);
     btnBackShelf.hidden = !inReader;
-    modeCapsuleEl.hidden = !inReader;
+    modeCapsuleEl.hidden = !inReader || !hasComic;
     btnAutoplay.hidden = !inReader;
     if (btnSpeed) btnSpeed.hidden = !inReader;
     readerFooterEl.hidden = !inReader;
@@ -303,9 +313,11 @@ function syncChrome() {
     if (inReader) {
         headerBookTitle.hidden = false;
         headerBookTitle.textContent = `${state.currentBook.emoji || ''}《${state.currentBook.title}》`;
+        btnModeStorybook.textContent = state.currentBook.bookType === 'notebook' ? '📝 积累本' : '📖 绘本';
     } else {
         headerBookTitle.hidden = true;
         headerBookTitle.textContent = '';
+        btnModeStorybook.textContent = '📖 绘本';
     }
 
     const isStory = state.mode === 'storybook';
@@ -646,13 +658,16 @@ function renderCurrentView({ flashMagic = false } = {}) {
     if (state.pageIndex >= pages.length) state.pageIndex = pages.length - 1;
     const page = pages[state.pageIndex];
 
-    if (state.mode === 'storybook') {
-        renderStorybookPage(mainStageEl, book, page, {
+    if (state.mode === 'storybook' || !bookHasComicPanels(book)) {
+        const rendererFn = book.bookType === 'notebook' ? renderNotebookPage : renderStorybookPage;
+        rendererFn(mainStageEl, book, page, {
             pageIndex: state.pageIndex,
             totalPages: pages.length,
             speakingKey: state.speakingKey,
             onSpeakParagraph: (para, _idx, key) => speakSingle(para.text, 'narrator', key),
             onSpeakPage: () => speakCurrentStorybookPageOnce(),
+            onSpeakCustom: ({ text, role, speakKey }) => speakSingle(text, role || 'narrator', speakKey),
+            onZoomImage: (info) => openArtLightbox(info),
             onEditPage: (target) => {
                 audioEngine.unlockInGesture();
                 storyMailbox.open(target);
@@ -700,7 +715,9 @@ async function openBook(bookId, pageNum = 1, modeOverride = null, { flashMagic =
         }
         state.pageIndex = Math.max(0, Math.min(totalPages - 1, targetPageNum - 1));
 
-        if (modeOverride) {
+        if (!bookHasComicPanels(book)) {
+            state.mode = 'storybook';
+        } else if (modeOverride) {
             state.mode = modeOverride;
         } else {
             const manifestItem = state.manifestBooks.find((b) => b.id === bookId);

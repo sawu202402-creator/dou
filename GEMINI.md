@@ -12,15 +12,20 @@
 每当小豌豆在对话中：**说出新故事点子 / 续写新的一页或新章节 / 要求修改某页剧情、台词、角色或画面分镜**，你必须**自动、完整地执行以下全部 5 个步骤**，不得遗漏任何一步：
 
 ### 第 1 步：编写图文与分镜数据
-1. **新建整本新书**：
+1. **新建整本新书（页数无限制，可按题材灵活选型）**：
+   - **页数不受固定 4 页限制**：原创绘本漫画通常 4~12+ 页，好文章/好词好句积累本可随时扩充至 10~50+ 页以上。
+   - **支持两种书目形态**：
+     - `"picture_comic"`（默认，绘本与多格漫画双模式）：每页需包含 `illustration` 与完整 `comicLayout` + `panels`。
+     - `"notebook"`（文字主导积累本）：适合中国好文章、童话好词好句与长期摘抄；页内可不画多格分镜（`illustration`、`panels` 均为可选），重点提供 `articleTitle`、`articleAuthor`、`genre`、`storyParagraphs`、`goodWords`、`goodSentences` 与 `readingTip`。
    - 在 `books/<book-id>/` 下创建 `book.json` 与 `images/` 目录（`<book-id>` 使用小写英文字母与连字符，如 `rainbow-treehouse`）。
    - 将新书条目添加到 `books/manifest.json` 的 `books` 数组**最前面**（保证新书出现在右屏书架第一位）。
 2. **续写章节或修改分镜**：
    - 编辑对应 `books/<book-id>/book.json`（新增 page 对象或修改指定 page）。
    - 同步更新 `books/manifest.json` 中该书的 `pageCount` 与 `updatedAt`。
-3. **双阅读模式数据必须齐全**：
-   - **① 精装有声绘本模式字段**：每页必须包含 `illustration`（全彩大图路径）和 `storyParagraphs`（2~3 段适合二年级阅读的温暖故事正文，每段同时提供 `text` 与逐字对齐的 `pinyin`）。
-   - **② 彩色多格漫画模式字段**：每页必须包含 `comicLayout`（`"hero-top"` | `"hero-bottom"` | `"grid-2x2"` | `"strip-3"`）与 `panels` 数组（通常 3~4 格）；每个分镜包含 `image`、可选 `caption` + `captionPinyin`、至少 1 个彩色拟声词贴纸 `stickers`、以及 `bubbles`（对话气泡，含 `characterId`、`text`、`pinyin`、`side`）。
+3. **双阅读模式与积累本数据规范**：
+   - **① 精装有声绘本模式字段**：每页包含 `storyParagraphs`（2~3 段适合二年级阅读的故事或经典文章片段，每段同时提供 `text` 与逐字对齐的 `pinyin`）；`picture_comic` 类型必填 `illustration`（`notebook` 类型可选）。
+   - **② 彩色多格漫画模式字段**：`picture_comic` 类型每页必填 `comicLayout`（`"hero-top"` | `"hero-bottom"` | `"grid-2x2"` | `"strip-3"`）与 `panels` 数组（`notebook` 类型可选）；每个分镜包含 `image`、可选 `caption` + `captionPinyin`、至少 1 个彩色拟声词贴纸 `stickers`、以及 `bubbles`（对话气泡，含 `characterId`、`text`、`pinyin`、`side`）。
+   - **③ 文字积累本专属字段（`bookType: "notebook"` 可选）**：`articleTitle`、`articleAuthor`、`genre`、`goodWords`（`[{ word, pinyin, meaning }]`）、`goodSentences`（`[{ text, pinyin, note }]`）、`readingTip`。
 4. **二年级多音字拼音 1-to-1 精准对齐**：
    - 每一处带 `pinyin` 的文本（`titlePinyin`、`storyParagraphs[*].pinyin`、`captionPinyin`、`bubbles[*].pinyin`），**汉字数量必须与空格分隔的拼音音节数量严格相等**，且只计算汉字（`/[\u4e00-\u9fff]/`），标点、空格、数字、字母和 Emoji 不写拼音。
    - 多音字必须按语境标对读音，例如：`月亮(yuè liang)`、`长耳朵(cháng ěr duo)`、`长大(zhǎng dà)`、`觉得(jué de)`、`睡觉(shuì jiào)`、`好(hǎo/hào)`、`着(zhe/zháo/zhuó)`、`乐(lè/yuè)`、`行(xíng/háng)`、`重(zhòng/chóng)`、`得(de/dé/děi)`、`只(zhī/zhǐ)`、`的(de)`、`了(le)`、`啊(a)`、`吗(ma)`。
