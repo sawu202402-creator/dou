@@ -1,0 +1,350 @@
+{
+  "id": "chinese-reading-notebook",
+  "title": "小豌豆的中国好文章积累本",
+  "titlePinyin": "xiǎo wān dòu de zhōng guó hǎo wén zhāng jī lěi běn",
+  "emoji": "📖",
+  "subtitle": "收录中国名家的优美文章、文章名称与作者，还能一直往后添新篇哦！",
+  "author": "小豌豆 & 魔法画师",
+  "cover": "books/chinese-reading-notebook/images/cover.webp",
+  "artStyleBible": "Warm whimsical Chinese children's picture book watercolor and gouache illustration, soft warm-brown ink outlines, sunlit celadon-jade, peach blossom pink, golden parchment cream, and gentle misty ink-wash mountains palette, poetic literary atmosphere, strictly no text/words/Chinese characters/letters/speech bubbles/watermarks. Characters: Xiao Wandou (7yo Chinese girl with two neat hair buns tied with pink ribbons, cream bunny-ear headband, lavender embroidered cardigan over pastel dress, holding a cream star-embossed notebook and pastel fountain pen); Mochi Bunny (plump tiny white lop-eared rabbit with miniature scholar cap and mint neckerchief); Momo Ink-Brush Sprite (cute round chibi ink-brush spirit in sky-blue traditional vest with round glasses and tiny blank golden scroll); Grandpa Bookkeeper (warm smiling Chinese grandpa with white beard, round spectacles, and beige scholar robe); Little Plum-Blossom Cat (adorable cream-orange Chinese tabby cat with soft pink paws).",
+  "characters": {
+    "pea": {
+      "name": "小豌豆",
+      "emoji": "🐰",
+      "voiceRole": "pea",
+      "bubbleBg": "#FFF0F6",
+      "bubbleBorder": "#FF7FA5",
+      "badgeBg": "#FFD6E5"
+    },
+    "mochi": {
+      "name": "麻薯兔",
+      "emoji": "🧁",
+      "voiceRole": "bunny",
+      "bubbleBg": "#ECFFF9",
+      "bubbleBorder": "#4ECDC4",
+      "badgeBg": "#C7F9EC"
+    },
+    "ink_sprite": {
+      "name": "墨墨书童",
+      "emoji": "📜",
+      "voiceRole": "star_boy",
+      "bubbleBg": "#EFF6FF",
+      "bubbleBorder": "#5B9BF3",
+      "badgeBg": "#D8E9FF"
+    },
+    "laoye": {
+      "name": "书香爷爷",
+      "emoji": "👴",
+      "voiceRole": "grandpa",
+      "bubbleBg": "#FFF9E2",
+      "bubbleBorder": "#E0A82E",
+      "badgeBg": "#FFECB3"
+    },
+    "cat": {
+      "name": "小梅花猫",
+      "emoji": "🐱",
+      "voiceRole": "cat",
+      "bubbleBg": "#FFF4E8",
+      "bubbleBorder": "#F08C42",
+      "badgeBg": "#FFE2C4"
+    }
+  },
+  "pages": [
+    {
+      "pageNumber": 1,
+      "title": "《春》· 朱自清",
+      "titlePinyin": "chūn zhū zì qīng",
+      "illustration": "books/chinese-reading-notebook/images/p01-1.webp",
+      "storyParagraphs": [
+        {
+          "text": "【篇名：《春》｜作者：朱自清】盼望着，盼望着，东风来了，春天的脚步近了。一切都像刚睡醒的样子，欣欣然张开了眼。",
+          "pinyin": "piān míng chūn zuò zhě zhū zì qīng pàn wàng zhe pàn wàng zhe dōng fēng lái le chūn tiān de jiǎo bù jìn le yí qiè dōu xiàng gāng shuì xǐng de yàng zi xīn xīn rán zhāng kāi le yǎn"
+        },
+        {
+          "text": "桃树、杏树、梨树，你不让我，我不让你，都开满了花赶趟儿。红的像火，粉的像霞，白的像雪。",
+          "pinyin": "táo shù xìng shù lí shù nǐ bú ràng wǒ wǒ bú ràng nǐ dōu kāi mǎn le huā gǎn tàng er hóng de xiàng huǒ fěn de xiàng xiá bái de xiàng xuě"
+        },
+        {
+          "text": "花下成千成百的蜜蜂嗡嗡地闹着，大小的蝴蝶飞来飞去。好词积累：欣欣然、赶趟儿、像火像霞像雪！",
+          "pinyin": "huā xià chéng qiān chéng bǎi de mì fēng wēng wēng de nào zhe dà xiǎo de hú dié fēi lái fēi qù hǎo cí jī lěi xīn xīn rán gǎn tàng er xiàng huǒ xiàng xiá xiàng xuě"
+        }
+      ],
+      "comicLayout": "hero-top",
+      "panels": [
+        {
+          "image": "books/chinese-reading-notebook/images/p01-1.webp",
+          "caption": "小豌豆翻开新做的中国好文章积累本，第一篇选的是朱自清爷爷写的《春》。",
+          "captionPinyin": "xiǎo wān dòu fān kāi xīn zuò de zhōng guó hǎo wén zhāng jī lěi běn dì yī piān xuǎn de shì zhū zì qīng yé ye xiě de chūn",
+          "stickers": [
+            { "text": "沙沙沙～📖", "style": "pop-gold", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "ink_sprite",
+              "text": "这一篇叫《春》，作者是中国作家朱自清哦！",
+              "pinyin": "zhè yì piān jiào chūn zuò zhě shì zhōng guó zuò jiā zhū zì qīng o",
+              "side": "left"
+            },
+            {
+              "characterId": "pea",
+              "text": "春天的脚步近了，我要把好句记下来！",
+              "pinyin": "chūn tiān de jiǎo bù jìn le wǒ yào bǎ hǎo jù jì xià lái",
+              "side": "right"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p01-2.webp",
+          "caption": "桃树、杏树和梨树开满彩色花朵，美得像火、像霞又像雪。",
+          "captionPinyin": "táo shù xìng shù hé lí shù kāi mǎn cǎi sè huā duǒ měi de xiàng huǒ xiàng xiá yòu xiàng xuě",
+          "stickers": [
+            { "text": "绽放！🌸", "style": "pop-pink", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "mochi",
+              "text": "红的像火，粉的像霞，白的像雪，读起来真像一首诗！",
+              "pinyin": "hóng de xiàng huǒ fěn de xiàng xiá bái de xiàng xuě dú qǐ lái zhēn xiàng yì shǒu shī",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p01-3.webp",
+          "caption": "花朵下面蜜蜂嗡嗡闹着，彩色蝴蝶飞来飞去。",
+          "captionPinyin": "huā duǒ xià miàn mì fēng wēng wēng nào zhe cǎi sè hú dié fēi lái fēi qù",
+          "stickers": [
+            { "text": "嗡嗡闹～🐝", "style": "pop-mint", "pos": "top-right", "rotate": 7 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "学会赶趟儿和欣欣然，写春游作文就能用上啦！",
+              "pinyin": "xué huì gǎn tàng er hé xīn xīn rán xiě chūn yóu zuò wén jiù néng yòng shàng la",
+              "side": "left"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 2,
+      "title": "《祖父的园子》· 萧红",
+      "titlePinyin": "zǔ fù de yuán zi xiāo hóng",
+      "illustration": "books/chinese-reading-notebook/images/p02-2.webp",
+      "storyParagraphs": [
+        {
+          "text": "【篇名：《祖父的园子》｜作者：萧红】我家有一个大花园，这花园里蜂子、蝴蝶、蜻蜓、蚂蚱，样样都有。",
+          "pinyin": "piān míng zǔ fù de yuán zi zuò zhě xiāo hóng wǒ jiā yǒu yí gè dà huā yuán zhè huā yuán lǐ fēng zi hú dié qīng tíng mà zha yàng yàng dōu yǒu"
+        },
+        {
+          "text": "好看的是大红蝴蝶，满身带着金粉。蜻蜓是金的，蚂蚱是绿的，蜂子则嗡嗡地飞着，满身绒毛，落到一朵花上，胖圆圆的就和一个小毛球似的不动了。",
+          "pinyin": "hǎo kàn de shì dà hóng hú dié mǎn shēn dài zhe jīn fěn qīng tíng shì jīn de mà zha shì lǜ de fēng zi zé wēng wēng de fēi zhe mǎn shēn róng máo luò dào yì duǒ huā shàng pàng yuán yuán de jiù hé yí gè xiǎo máo qiú shì de bú dòng le"
+        },
+        {
+          "text": "花园里边明晃晃的，红的红，绿的绿，新鲜漂亮。好词积累：明晃晃、胖圆圆、小毛球似的！",
+          "pinyin": "huā yuán lǐ biān míng huǎng huǎng de hóng de hóng lǜ de lǜ xīn xiān piào liang hǎo cí jī lěi míng huǎng huǎng pàng yuán yuán xiǎo máo qiú shì de"
+        }
+      ],
+      "comicLayout": "strip-3",
+      "panels": [
+        {
+          "image": "books/chinese-reading-notebook/images/p02-1.webp",
+          "caption": "书香爷爷带小豌豆走进作家萧红写的《祖父的园子》。",
+          "captionPinyin": "shū xiāng yé ye dài xiǎo wān dòu zǒu jìn zuò jiā xiāo hóng xiě de zǔ fù de yuán zi",
+          "stickers": [
+            { "text": "明晃晃！☀️", "style": "pop-gold", "pos": "top-right", "rotate": -5 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "laoye",
+              "text": "文章叫《祖父的园子》，作者是中国女作家萧红。",
+              "pinyin": "wén zhāng jiào zǔ fù de yuán zi zuò zhě shì zhōng guó nǚ zuò jiā xiāo hóng",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p02-2.webp",
+          "caption": "带着金粉的大红蝴蝶、金蜻蜓和绿蚂蚱在花叶间飞舞。",
+          "captionPinyin": "dài zhe jīn fěn de dà hóng hú dié jīn qīng tíng hé lǜ mà zha zài huā yè jiān fēi wǔ",
+          "stickers": [
+            { "text": "闪金粉～🦋", "style": "pop-pink", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "红的红，绿的绿，连蝴蝶都像涂了闪闪金粉！",
+              "pinyin": "hóng de hóng lǜ de lǜ lián hú dié dōu xiàng tú le shǎn shǎn jīn fěn",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p02-3.webp",
+          "caption": "胖圆圆的绒毛小蜜蜂落到花朵上，像个小毛球一样不动了。",
+          "captionPinyin": "pàng yuán yuán de róng máo xiǎo mì fēng luò dào huā duǒ shàng xiàng gè xiǎo máo qiú yí yàng bú dòng le",
+          "stickers": [
+            { "text": "毛茸茸～🍯", "style": "pop-mint", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "mochi",
+              "text": "哈哈，把胖蜜蜂比作小毛球，写得太可爱了！",
+              "pinyin": "hā hā bǎ pàng mì fēng bǐ zuò xiǎo máo qiú xiě de tài kě ài le",
+              "side": "left"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 3,
+      "title": "《猫》· 老舍",
+      "titlePinyin": "māo lǎo shě",
+      "illustration": "books/chinese-reading-notebook/images/p03-1.webp",
+      "storyParagraphs": [
+        {
+          "text": "【篇名：《猫》｜作者：老舍】猫的性格实在有些古怪。说它老实吧，它的确有时候很乖，找个暖和的地方成天睡大觉，无忧无虑。",
+          "pinyin": "piān míng māo zuò zhě lǎo shě māo de xìng gé shí zài yǒu xiē gǔ guài shuō tā lǎo shi ba tā dí què yǒu shí hou hěn guāi zhǎo gè nuǎn huo de dì fang chéng tiān shuì dà jiào wú yōu wú lǜ"
+        },
+        {
+          "text": "可是，它听到老鼠的一点响动，又是多么尽职。它屏息凝视，一连就是几个钟头，非把老鼠等出来不可！",
+          "pinyin": "kě shì tā tīng dào lǎo shǔ de yì diǎn xiǎng dòng yòu shì duō me jìn zhí tā bǐng xī níng shì yì lián jiù shì jǐ gè zhōng tóu fēi bǎ lǎo shǔ děng chū lái bù kě"
+        },
+        {
+          "text": "它要是高兴，能比谁都温柔可亲：用身子蹭你的腿，或是在写作时跳上桌来，在稿纸上踩印几朵小梅花。",
+          "pinyin": "tā yào shi gāo xìng néng bǐ shuí dōu wēn róu kě qīn yòng shēn zi cèng nǐ de tuǐ huò shì zài xiě zuò shí tiào shàng zhuō lái zài gǎo zhǐ shàng cǎi yìn jǐ duǒ xiǎo méi huā"
+        }
+      ],
+      "comicLayout": "hero-top",
+      "panels": [
+        {
+          "image": "books/chinese-reading-notebook/images/p03-1.webp",
+          "caption": "第三篇选了老舍爷爷写的《猫》，小猫在暖洋洋的窗台睡大觉。",
+          "captionPinyin": "dì sān piān xuǎn le lǎo shě yé ye xiě de māo xiǎo māo zài nuǎn yáng yáng de chuāng tái shuì dà jiào",
+          "stickers": [
+            { "text": "呼噜呼噜～💤", "style": "pop-gold", "pos": "top-right", "rotate": 5 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "cat",
+              "text": "喵呜，太阳真暖和，让我无忧无虑睡一会儿！",
+              "pinyin": "miāo wū tài yáng zhēn nuǎn huo ràng wǒ wú yōu wú lǜ shuì yí huì er",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p03-2.webp",
+          "caption": "听到老鼠响动，小猫立刻认真地屏息凝视。",
+          "captionPinyin": "tīng dào lǎo shǔ xiǎng dòng xiǎo māo lì kè rèn zhēn de bǐng xī níng shì",
+          "stickers": [
+            { "text": "沙沙…👀", "style": "pop-purple", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "ink_sprite",
+              "text": "屏息凝视的意思是连大气都不敢出，盯得超认真！",
+              "pinyin": "bǐng xī níng shì de yì si shì lián dà qì dōu bù gǎn chū dīng de chāo rèn zhēn",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p03-3.webp",
+          "caption": "小猫高兴时跳上书桌，在稿纸上印出几朵小梅花！",
+          "captionPinyin": "xiǎo māo gāo xìng shí tiào shàng shū zhuō zài gǎo zhǐ shàng yìn chū jǐ duǒ xiǎo méi huā",
+          "stickers": [
+            { "text": "踩梅花！🐾", "style": "pop-pink", "pos": "top-right", "rotate": 7 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "把小猫脚印叫作小梅花，老舍爷爷太喜欢小猫了！",
+              "pinyin": "bǎ xiǎo māo jiǎo yìn jiào zuò xiǎo méi huā lǎo shě yé ye tài xǐ huan xiǎo māo le",
+              "side": "left"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 4,
+      "title": "《白鹅》· 丰子恺",
+      "titlePinyin": "bái é fēng zǐ kǎi",
+      "illustration": "books/chinese-reading-notebook/images/p04-3.webp",
+      "storyParagraphs": [
+        {
+          "text": "【篇名：《白鹅》｜作者：丰子恺】鹅的步态，更是傲慢了。大体上与鸭相似，但鸭的步调急速，有局促不安之相。",
+          "pinyin": "piān míng bái é zuò zhě fēng zǐ kǎi é de bù tài gèng shì ào màn le dà tǐ shàng yǔ yā xiāng sì dàn yā de bù diào jí sù yǒu jú cù bù ān zhī xiàng"
+        },
+        {
+          "text": "鹅的步调从容，大模大样的，颇像京剧里的净角出场。它常傲然地站着，看见人走来也毫不相让。",
+          "pinyin": "é de bù diào cóng róng dà mú dà yàng de pō xiàng jīng jù lǐ de jìng jué chū chǎng tā cháng ào rán de zhàn zhe kàn jiàn rén zǒu lái yě háo bù xiāng ràng"
+        },
+        {
+          "text": "积累小贴士：用“净角出场”比喻白鹅走路，又神气又有趣！以后遇到喜欢的中国好文章，随时继续往积累本后面添哦！",
+          "pinyin": "jī lěi xiǎo tiē shì yòng jìng jué chū chǎng bǐ yù bái é zǒu lù yòu shén qì yòu yǒu qù yǐ hòu yù dào xǐ huan de zhōng guó hǎo wén zhāng suí shí jì xù wǎng jī lěi běn hòu miàn tiān o"
+        }
+      ],
+      "comicLayout": "hero-bottom",
+      "panels": [
+        {
+          "image": "books/chinese-reading-notebook/images/p04-1.webp",
+          "caption": "第四篇是丰子恺爷爷写的《白鹅》。小鸭子总是匆匆忙忙小步快走。",
+          "captionPinyin": "dì sì piān shì fēng zǐ kǎi yé ye xiě de bái é xiǎo yā zi zǒng shì cōng cōng máng máng xiǎo bù kuài zǒu",
+          "stickers": [
+            { "text": "摇摇摆摆～🦆", "style": "pop-mint", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "mochi",
+              "text": "小鸭子摇摇摆摆，步调真是又快又着急呀！",
+              "pinyin": "xiǎo yā zi yáo yáo bǎi bǎi bù diào zhēn shì yòu kuài yòu zháo jí ya",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p04-2.webp",
+          "caption": "大白鹅却挺起胸脯，步调从容、大模大样，像京剧净角出场！",
+          "captionPinyin": "dà bái é què tǐng qǐ xiōng pú bù diào cóng róng dà mú dà yàng xiàng jīng jù jìng jué chū chǎng",
+          "stickers": [
+            { "text": "铛铛铛！🎭", "style": "pop-gold", "pos": "top-right", "rotate": -7 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "laoye",
+              "text": "丰子恺爷爷把大白鹅写得好像京剧大将军，神气极了！",
+              "pinyin": "fēng zǐ kǎi yé ye bǎ dà bái é xiě de hǎo xiàng jīng jù dà jiāng jūn shén qì jí le",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p04-3.webp",
+          "caption": "四篇中国美文收进积累本，后面还留着闪亮的空白新页等继续更新！",
+          "captionPinyin": "sì piān zhōng guó měi wén shōu jìn jī lěi běn hòu miàn hái liú zhe shǎn liàng de kòng bái xīn yè děng jì xù gēng xīn",
+          "stickers": [
+            { "text": "随时更新！✨", "style": "pop-pink", "pos": "top-right", "rotate": 5 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "我有自己的中国好文章积累本啦！下次还要加更多名篇！",
+              "pinyin": "wǒ yǒu zì jǐ de zhōng guó hǎo wén zhāng jī lěi běn la xià cì hái yào jiā gèng duō míng piān",
+              "side": "left"
+            },
+            {
+              "characterId": "ink_sprite",
+              "text": "点点页面上的「改这一页」，随时就能请画师续写新文章哦！",
+              "pinyin": "diǎn dian yè miàn shàng de gǎi zhè yì yè suí shí jiù néng qǐng huà shī xù xiě xīn wén zhāng o",
+              "side": "right"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
