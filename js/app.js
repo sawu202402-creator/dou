@@ -7,6 +7,7 @@
 import { StoryAudioEngine } from './audioEngine.js';
 import { HotReloadWatcher } from './hotReload.js';
 import { StoryMailboxController } from './storyMailbox.js';
+import { VoiceStudioController } from './voiceStudio.js';
 import {
     renderBookshelf,
     renderStorybookPage,
@@ -39,6 +40,8 @@ const speedIconEl = document.getElementById('speed-icon');
 const speedLabelEl = document.getElementById('speed-label');
 const btnToggleMute = document.getElementById('btn-toggle-mute');
 const btnRefreshApp = document.getElementById('btn-refresh-app');
+const btnOpenVoiceStudio = document.getElementById('btn-open-voice-studio');
+const voiceStudioDot = document.getElementById('voice-studio-dot');
 const btnOpenMailbox = document.getElementById('btn-open-mailbox');
 const mailboxUnreadBadge = document.getElementById('mailbox-unread-badge');
 const readerFooterEl = document.getElementById('reader-footer');
@@ -162,6 +165,34 @@ const storyMailbox = new StoryMailboxController({
     },
     onPatrolChange: () => syncPatrolBadge()
 });
+
+const voiceStudio = new VoiceStudioController({
+    audioEngine,
+    onBeforeOpen: () => stopAutoplay(),
+    onProfileChange: () => {
+        syncVoiceStudioBadge();
+        if (state.view === 'shelf' && state.manifestBooks.length > 0) {
+            renderCurrentView();
+        }
+    }
+});
+
+function syncVoiceStudioBadge() {
+    const p = voiceStudio.getProfile() || {};
+    if (voiceStudioDot) {
+        voiceStudioDot.classList.toggle('is-ready', Boolean(p.cloneReady));
+        voiceStudioDot.classList.toggle('is-pending', Boolean((p.hasSample || p.overrideVoiceConfigured) && !p.cloneReady));
+    }
+    if (btnOpenVoiceStudio) {
+        if (p.cloneReady) {
+            btnOpenVoiceStudio.title = `小豌豆专属声线生效中（${p.providerLabel || p.provider}），点击管理或重新录制`;
+        } else if (p.hasSample) {
+            btnOpenVoiceStudio.title = '小豌豆真实原声已存入云端，点击试听或配置 AI 克隆密钥';
+        } else {
+            btnOpenVoiceStudio.title = '录一段小豌豆真实声音，让所有故事书里的我都变成你的声线！';
+        }
+    }
+}
 
 function syncPatrolBadge() {
     if (!liveStatusEl || !liveTextEl) return;
@@ -580,6 +611,7 @@ function renderCurrentView({ flashMagic = false } = {}) {
             latestBookId: state.updatedBookId,
             updatedJustNow: Boolean(state.updatedBookId),
             readingProgress: state.readingProgress,
+            voiceProfile: voiceStudio.getProfile(),
             onOpenBook: (bookId) => {
                 audioEngine.unlockInGesture();
                 openBook(bookId, null, null, { resumeProgress: true });
@@ -593,6 +625,10 @@ function renderCurrentView({ flashMagic = false } = {}) {
             onOpenMailbox: () => {
                 audioEngine.unlockInGesture();
                 storyMailbox.open();
+            },
+            onOpenVoiceStudio: () => {
+                audioEngine.unlockInGesture();
+                voiceStudio.open();
             }
         });
         warmShelfBooksInBackground();
@@ -776,6 +812,11 @@ function bindEvents() {
         if (e.target === artLightboxEl) closeArtLightbox();
     });
 
+    btnOpenVoiceStudio?.addEventListener('click', () => {
+        audioEngine.unlockInGesture();
+        voiceStudio.open();
+    });
+
     btnOpenMailbox?.addEventListener('click', () => {
         audioEngine.unlockInGesture();
         storyMailbox.open();
@@ -894,8 +935,14 @@ const hotWatcher = new HotReloadWatcher({
             renderCurrentView();
         }
 
-        storyMailbox.syncFromCloud().catch(() => {});
+        if (!data.silent && data.announcement) {
+            storyMailbox.markBookRepliesAnnounced(data.latestBookId || '');
+        }
+        await storyMailbox.syncFromCloud({ suppressNewReplyCallback: !data.silent }).catch(() => {});
         if (!data.silent) {
+            if (data.announcement) {
+                storyMailbox.markBookRepliesAnnounced(data.latestBookId || '');
+            }
             state.bannerMode = 'version';
             showHotReloadBanner(data);
             if (data.announcement && !audioEngine.muted) {
@@ -908,8 +955,10 @@ const hotWatcher = new HotReloadWatcher({
 async function bootstrap() {
     bindEvents();
     syncPatrolBadge();
+    syncVoiceStudioBadge();
     storyMailbox.bindBadgeEl(mailboxUnreadBadge);
     storyMailbox.init();
+    voiceStudio.init().catch(() => {});
     try {
         await fetchManifest();
         const params = new URLSearchParams(window.location.search);
@@ -945,7 +994,8 @@ window.__PEA_STORY_HOUSE__ = {
     }),
     checkVersionNow: () => hotWatcher.checkNow(),
     audioEngine,
-    mailbox: storyMailbox
+    mailbox: storyMailbox,
+    voiceStudio
 };
 
 bootstrap();

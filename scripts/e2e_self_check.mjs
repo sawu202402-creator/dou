@@ -74,6 +74,25 @@ function startLocalServer() {
     };
     const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0, patrolPostCalls: 0, dispatchCalls: 0, lastWhisperHints: '' };
     let dispatchRequestedAt = 0;
+    let voiceSampleAudioB64 = '';
+    let voiceProfile = {
+        role: 'pea',
+        hasSample: false,
+        enabled: false,
+        version: 0,
+        durationMs: 0,
+        sampleText: '',
+        sampleMime: 'audio/wav',
+        updatedAt: 0,
+        updatedStr: '',
+        cloneReady: false,
+        provider: 'siliconflow',
+        providerLabel: '硅基流动 SiliconFlow (CosyVoice2)',
+        providerConfigured: true,
+        providerVoiceSynced: false,
+        overrideVoiceConfigured: false,
+        lastError: ''
+    };
     let liveVersionObj = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
 
     const srv = http.createServer((req, res) => {
@@ -82,7 +101,96 @@ function startLocalServer() {
 
         if (urlPath === '/api/health') {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ ok: true, service: 'pea-story-house-e2e', ai: true, mailbox: true }));
+            res.end(JSON.stringify({
+                ok: true,
+                service: 'pea-story-house-e2e',
+                ai: true,
+                mailbox: true,
+                voiceClone: { configured: true, provider: 'siliconflow', providerLabel: voiceProfile.providerLabel }
+            }));
+            return;
+        }
+
+        if (urlPath.startsWith('/api/voice-profile')) {
+            let bodyRaw = '';
+            req.on('data', (chunk) => { bodyRaw += chunk.toString(); });
+            req.on('end', () => {
+                const body = bodyRaw ? JSON.parse(bodyRaw) : {};
+                if (req.method === 'GET' && urlPath === '/api/voice-profile') {
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    return;
+                }
+                if (req.method === 'GET' && urlPath === '/api/voice-profile/sample') {
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        ok: true,
+                        role: 'pea',
+                        hasSample: voiceProfile.hasSample,
+                        audioBase64: voiceSampleAudioB64,
+                        sampleMime: voiceProfile.sampleMime,
+                        durationMs: voiceProfile.durationMs,
+                        sampleText: voiceProfile.sampleText,
+                        version: voiceProfile.version
+                    }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/voice-profile') {
+                    voiceSampleAudioB64 = String(body.audioBase64 || '');
+                    voiceProfile = {
+                        ...voiceProfile,
+                        hasSample: voiceSampleAudioB64.length >= 2000,
+                        enabled: true,
+                        version: (voiceProfile.version || 0) + 1,
+                        durationMs: Number(body.durationMs) || 8500,
+                        sampleText: String(body.sampleText || ''),
+                        sampleMime: String(body.sampleMime || 'audio/wav'),
+                        updatedAt: Date.now(),
+                        updatedStr: '11/28 12:35',
+                        providerVoiceSynced: true,
+                        cloneReady: voiceSampleAudioB64.length >= 2000
+                    };
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/voice-profile/toggle') {
+                    voiceProfile = {
+                        ...voiceProfile,
+                        enabled: Boolean(body.enabled),
+                        cloneReady: Boolean(body.enabled) && voiceProfile.hasSample && voiceProfile.providerConfigured
+                    };
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/voice-profile/test') {
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        ok: true,
+                        mode: voiceProfile.cloneReady ? 'cloned' : 'unconfigured',
+                        audioBase64: sampleWavBase64,
+                        message: voiceProfile.cloneReady ? '已用专属 AI 克隆声线试听！' : '待配置',
+                        profile: voiceProfile
+                    }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/voice-profile/delete') {
+                    voiceSampleAudioB64 = '';
+                    voiceProfile = {
+                        ...voiceProfile,
+                        hasSample: false,
+                        enabled: false,
+                        providerVoiceSynced: false,
+                        cloneReady: false
+                    };
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    return;
+                }
+                res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ ok: false }));
+            });
             return;
         }
 
@@ -91,16 +199,20 @@ function startLocalServer() {
             req.on('data', (chunk) => { bodyRaw += chunk.toString(); });
             req.on('end', () => {
                 const parsed = bodyRaw ? JSON.parse(bodyRaw) : {};
+                const reqRole = String(parsed.role || 'narrator');
+                const voiceSource = (reqRole === 'pea' && voiceProfile.cloneReady) ? 'cloned' : 'neural';
                 ttsLog.push({
                     text: String(parsed.text || ''),
-                    role: String(parsed.role || 'narrator'),
+                    role: reqRole,
+                    voiceSource,
                     ts: Date.now()
                 });
                 res.writeHead(200, {
                     'Content-Type': 'application/json; charset=utf-8',
-                    'Cache-Control': 'no-store'
+                    'Cache-Control': 'no-store',
+                    'X-Voice-Source': voiceSource
                 });
-                res.end(JSON.stringify({ ok: true, role: parsed.role || 'narrator', audioBase64: sampleWavBase64 }));
+                res.end(JSON.stringify({ ok: true, role: reqRole, voiceSource, audioBase64: sampleWavBase64 }));
             });
             return;
         }
@@ -526,7 +638,7 @@ async function main() {
         );
         assert.equal(await evalJs(`document.getElementById('smDispatchBar').hidden`), false, '发完点子后应显示「说好啦，立刻开工」提示栏');
         await evalJs(`document.getElementById('smDispatchBtn').click()`);
-        await waitFor(`document.getElementById('smDispatchBtn').disabled === true`, 3000, 'dispatch now clicked');
+        await waitFor(`document.getElementById('smDispatchBtn').disabled === true && document.getElementById('smDispatchBtn').textContent.includes('已通知开工')`, 3000, 'dispatch now clicked');
         assert.ok(mailboxLog.dispatchCalls >= 1, '点击立刻开工应请求 POST /api/mailbox/dispatch');
         await evalJs(`document.getElementById('smPatrolSwitch').click()`);
         await waitFor(`document.getElementById('live-status').getAttribute('aria-pressed') === 'false'`, 3000, 'restore patrol OFF');
@@ -558,6 +670,60 @@ async function main() {
         await evalJs(`document.getElementById('btn-back-shelf').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'return to shelf');
         console.log('✓ [590x820] 站内语音识别、唤醒提示、防跳底滚动与云端回信直达通过');
+
+        // 测试「🎙️ 我的声音」AI 声线克隆录音室（录音样本上传 + 试听 + 开关 + 缓存签名切换 + 零横向溢出）
+        const longMockWav = makeSilentWavBase64(0.15);
+        await evalJs(`document.getElementById('btn-open-voice-studio').click()`);
+        await waitFor(`document.getElementById('voiceStudioOverlay').hidden === false`, 3000, 'open voice studio');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '分屏我的声音弹窗存在横向溢出');
+        await evalJs(`document.querySelector('.vs-prompt-tab[data-prompt-id="sea"]').click()`);
+        assert.equal(await evalJs(`document.querySelector('.vs-prompt-tab[data-prompt-id="sea"]').classList.contains('is-active')`), true, '朗读卡片切换应高亮');
+
+        await evalJs(`window.__MOCK_VOICE_STUDIO_WAV__ = { audioBase64: ${JSON.stringify(longMockWav)}, durationMs: 8500 };`);
+        await evalJs(`document.getElementById('vsRecBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.isRecording === true`, 2000, 'voice studio mock record start');
+        await evalJs(`document.getElementById('vsRecBtn').click()`);
+        await waitFor(`document.getElementById('vsDraftActions').hidden === false`, 2000, 'voice studio mock record stop');
+
+        await evalJs(`document.getElementById('vsSaveBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile().cloneReady === true`, 4000, 'save voice clone profile');
+        assert.equal(await evalJs(`document.getElementById('vsSavedCard').hidden`), false, '保存后应展示声音档案管理卡片');
+        assert.equal(await evalJs(`document.getElementById('voice-studio-dot').classList.contains('is-ready')`), true, '顶部我的声音状态点应点亮绿灯');
+        assert.ok(await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine._voiceSig.startsWith('clone-')`), '保存声线后应更新 pea 音频缓存签名');
+
+        await evalJs(`document.getElementById('vsTestCloneBtn').click()`);
+        await waitFor(`document.getElementById('vsStatusHint').textContent.includes('试听')`, 4000, 'test cloned voice preview');
+
+        await evalJs(`document.getElementById('vsEnableSwitch').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile().cloneReady === false && window.__PEA_STORY_HOUSE__.audioEngine._voiceSig === 'default'`, 3000, 'toggle clone off');
+        await evalJs(`document.getElementById('vsEnableSwitch').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile().cloneReady === true && window.__PEA_STORY_HOUSE__.audioEngine._voiceSig.startsWith('clone-')`, 3000, 'toggle clone back on');
+
+        await evalJs(`document.getElementById('vsCloseBtn').click()`);
+        await waitFor(`document.getElementById('voiceStudioOverlay').hidden === true`, 2000, 'close voice studio');
+        const shelfVoiceText = await evalJs(`document.getElementById('btn-shelf-voice-studio')?.textContent || ''`);
+        assert.ok(shelfVoiceText.includes('专属声音生效中'), `书架声音按钮应更新为生效状态，实际: ${shelfVoiceText}`);
+
+        // 验证重复点击 sendWish() 防抖、同文本 800ms 播放去重
+        const prevWishCount = mailboxLog.wishCalls;
+        await evalJs(`(() => {
+            const inp = document.getElementById('smTextInput');
+            inp.value = '我想去恐龙乐园！';
+            window.__PEA_STORY_HOUSE__.mailbox.sendWish();
+            window.__PEA_STORY_HOUSE__.mailbox.sendWish();
+        })()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.mailbox.isSending === false && document.querySelectorAll('.sm-from-kid').length >= 2`, 4000, 'rapid double sendWish guard');
+        assert.equal(mailboxLog.wishCalls, prevWishCount + 1, '连点两次发送只应发出 1 次愿望、播放 1 次回复');
+
+        const dedupeRes = await evalJs(`(async () => {
+            window.__PEA_STORY_HOUSE__.audioEngine.stop();
+            const p1 = window.__PEA_STORY_HOUSE__.audioEngine.speak('测试防重复语音一句', 'narrator');
+            const p2 = await window.__PEA_STORY_HOUSE__.audioEngine.speak('测试防重复语音一句', 'narrator');
+            await p1;
+            return p2;
+        })()`);
+        assert.equal(dedupeRes.deduped, true, '同一句语音在播放中短时间内重复触发应被去重拦截');
+        console.log('✓ [590x820] 「我的声音」录音棚、声线克隆状态与防重复播放机制通过');
 
         // 验证书架上显示阅读进度，点开续读第 3 页，再切换到第 1 页做全页自检
         const shelfProgressText = await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"] .progress-pill')?.textContent || ''`);
@@ -707,7 +873,19 @@ async function main() {
         assert.ok(ttsLog.length >= 6, `全书连播应触发多句连续语音，实际 ${ttsLog.length}`);
         console.log('✓ [590x820] 全书连播跨页与多角色接力通过');
 
-        // 3 秒后台轮询热刷新 + 温柔语音提示校验
+        // 3 秒后台轮询热刷新 + 温柔语音提示校验（以及同书正式回信不重复播报校验）
+        const secondWishId = memWishes[1]?.id || '';
+        await fetch(`${origin}/api/mailbox/reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                replyToId: secondWishId,
+                bookId: 'moon-dessert-shop',
+                pageNumber: 2,
+                badgeTitle: '🎉 第2页热更新画好啦！',
+                text: '小豌豆，第 2 页会唱歌的星星布丁已经画好啦！'
+            })
+        });
         ttsLog.length = 0;
         const prevToken = await evalJs(`window.__E2E_PAGE_TOKEN__`);
         await fetch(`${origin}/__test/bump-version`);
@@ -724,9 +902,17 @@ async function main() {
         assert.equal(afterReload.bannerHidden, false, '热刷新提示横幅应当显示');
         assert.equal(afterReload.version, '2026.11.27.999', '版本应更新为新版本号');
         assert.equal(afterReload.pageIndex, 1, '热刷新应自动跳转至新更新的页码');
-        assert.ok(ttsLog.some((t) => t.role === 'system_notice'), '热刷新应调用 system_notice 温柔语音提示');
+        assert.equal(ttsLog.filter((t) => t.role === 'system_notice').length, 1, '热刷新只应播放 1 次 system_notice 温柔语音提示');
         await saveScreenshot(cdp, sessionId, '04-split-hot-reload.png');
-        console.log('✓ [590x820] 3 秒后台轮询原地热刷新与温柔语音播报通过');
+
+        ttsLog.length = 0;
+        await evalJs(`document.getElementById('btn-open-mailbox').click()`);
+        await waitFor(`document.getElementById('storyMailboxOverlay').hidden === false`, 3000, 'open mailbox after hot reload');
+        await sleep(250);
+        assert.equal(ttsLog.length, 0, '刚听过版本更新播报后立刻打开聊天窗，不应再次自动重复播报同一封正式回信');
+        await evalJs(`document.getElementById('smCloseBtn').click()`);
+        await waitFor(`document.getElementById('storyMailboxOverlay').hidden === true`, 2000, 'close mailbox after dedupe check');
+        console.log('✓ [590x820] 3 秒后台轮询原地热刷新与单次播报去重通过');
 
         // ============================================================
         // 2. iPad 横屏全屏测试 (1180 x 820, DPR 2)
@@ -752,6 +938,12 @@ async function main() {
         await evalJs(`document.getElementById('btn-back-shelf').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 4000, 'full shelf');
         assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '全屏书架存在横向溢出');
+
+        await evalJs(`document.getElementById('btn-open-voice-studio').click()`);
+        await waitFor(`document.getElementById('voiceStudioOverlay').hidden === false`, 3000, 'full voice studio open');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '全屏我的声音弹窗存在横向溢出');
+        await evalJs(`document.getElementById('vsCloseBtn').click()`);
+        await waitFor(`document.getElementById('voiceStudioOverlay').hidden === true`, 2000, 'full voice studio close');
 
         // 验证书架显示第 2 页进度，且再次点开直接续读第 2 页和偏好的漫画模式
         const p2Badge = await evalJs(`document.querySelector('.book-card[data-book-id="moon-dessert-shop"] .progress-pill')?.textContent || ''`);

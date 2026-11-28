@@ -46,6 +46,7 @@ function detectMimeFromBase64(b64) {
     const clean = String(b64 || '').trim();
     if (clean.startsWith('UklGR')) return 'audio/wav';
     if (clean.startsWith('T2dnUw')) return 'audio/ogg';
+    if (clean.startsWith('AAAA')) return 'audio/mp4';
     return 'audio/mpeg';
 }
 
@@ -74,6 +75,7 @@ export class StoryAudioEngine {
         this._audioCtx = null;
         this._activeBufferSrc = null;
         this._activeHtmlAudio = null;
+        this._activeObjectUrl = null;
         this._sharedHtmlAudio = null;
         this._sharedAudioUnlocked = false;
         this._warmedUp = false;
@@ -84,8 +86,12 @@ export class StoryAudioEngine {
         this._ttsMemCache = new Map();
         this._inflightTtsMap = new Map();
         this._cacheEpoch = 0;
+        this._voiceSig = 'default';
         this._cloudTtsUnavailable = false;
         this._pendingGesturePlay = null;
+        this._currentSpeakText = '';
+        this._currentSpeakAt = 0;
+        this._lastGestureAt = 0;
 
         this._zhFemaleVoice = null;
         this._zhMaleVoice = null;
@@ -176,7 +182,11 @@ export class StoryAudioEngine {
 
     _bindFirstGestureWarmup() {
         if (typeof window === 'undefined' || typeof document === 'undefined') return;
-        const onGesture = () => {
+        const onGesture = (ev) => {
+            const now = Date.now();
+            if (now - this._lastGestureAt < 120) return;
+            this._lastGestureAt = now;
+
             this.unlockInGesture();
             if (!this._warmedUp) {
                 this._warmedUp = true;
@@ -185,6 +195,11 @@ export class StoryAudioEngine {
             if (this._pendingGesturePlay && !this.muted) {
                 const pending = this._pendingGesturePlay;
                 this._pendingGesturePlay = null;
+                if (pending.expiresAt && now > pending.expiresAt) return;
+                const target = ev?.target;
+                if (target && typeof target.closest === 'function' && target.closest('button, [role="button"], a')) {
+                    return;
+                }
                 this.speak(pending.text, pending.role, pending.callbacks).catch(() => {});
             }
         };
@@ -214,6 +229,22 @@ export class StoryAudioEngine {
         if (Math.abs(next - this.playbackRate) < 0.001) return;
         this.playbackRate = next;
         this._notify();
+    }
+
+    setVoiceSignature(sig = 'default') {
+        const nextSig = String(sig || 'default').trim() || 'default';
+        if (nextSig === this._voiceSig) return;
+        this._voiceSig = nextSig;
+        for (const key of Array.from(this._ttsMemCache.keys())) {
+            if (key.startsWith('pea')) this._ttsMemCache.delete(key);
+        }
+        for (const key of Array.from(this._inflightTtsMap.keys())) {
+            if (key.startsWith('pea')) this._inflightTtsMap.delete(key);
+        }
+    }
+
+    _buildCacheKey(role = 'narrator', cleanText = '') {
+        return role === 'pea' ? `pea[${this._voiceSig}]::${cleanText}` : `${role}::${cleanText}`;
     }
 
     async clearCache() {
@@ -280,8 +311,16 @@ export class StoryAudioEngine {
         }
     }
 
+    _revokeActiveObjectUrl() {
+        if (this._activeObjectUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+            try { URL.revokeObjectURL(this._activeObjectUrl); } catch (_) {}
+        }
+        this._activeObjectUrl = null;
+    }
+
     _stopCurrentAudioNodes() {
         this._clearTimers();
+        this._revokeActiveObjectUrl();
         if (this._activeBufferSrc) {
             try {
                 this._activeBufferSrc.onended = null;
@@ -305,6 +344,8 @@ export class StoryAudioEngine {
 
     stop() {
         this._speakToken++;
+        this._pendingGesturePlay = null;
+        this._currentSpeakText = '';
         this._stopCurrentAudioNodes();
         this.isSpeaking = false;
         if (this._activeResolve) {
@@ -317,7 +358,7 @@ export class StoryAudioEngine {
 
     async _fetchNeuralTtsBase64(cleanText, role = 'narrator') {
         if (!cleanText || !this._shouldUseCloudTts()) return '';
-        const cacheKey = `${role}::${cleanText}`;
+        const cacheKey = this._buildCacheKey(role, cleanText);
         if (this._ttsMemCache.has(cacheKey)) {
             return this._ttsMemCache.get(cacheKey);
         }
@@ -390,10 +431,10 @@ export class StoryAudioEngine {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (Ctx) {
                 if (!this._audioCtx) this._audioCtx = new Ctx();
-                if (this._audioCtx.state === 'suspended') {
+                if (this._audioCtx.state === 'suspended' || this._audioCtx.state === 'interrupted') {
                     await Promise.race([
                         this._audioCtx.resume().catch(() => {}),
-                        new Promise(r => setTimeout(r, 150))
+                        new Promise(r => setTimeout(r, 350))
                     ]);
                 }
                 if (this._audioCtx.state === 'running') {
@@ -428,13 +469,20 @@ export class StoryAudioEngine {
             }
         } catch (_) {}
 
-        // 2. 次选复用单例 HTMLAudioElement
+        // 2. 次选复用单例 HTMLAudioElement（ObjectURL + 完整清理防止残留或重放）
         try {
             const audio = this._sharedHtmlAudio || (typeof Audio !== 'undefined' ? new Audio() : null);
             if (audio && token === this._speakToken && !this.muted) {
                 const mime = detectMimeFromBase64(b64);
+                const ab = base64ToArrayBuffer(b64);
+                this._revokeActiveObjectUrl();
+                let srcUrl = `data:${mime};base64,${b64}`;
+                if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                    this._activeObjectUrl = URL.createObjectURL(new Blob([ab], { type: mime }));
+                    srcUrl = this._activeObjectUrl;
+                }
                 audio.setAttribute('playsinline', 'true');
-                audio.src = `data:${mime};base64,${b64}`;
+                audio.src = srcUrl;
                 audio.playbackRate = this.playbackRate;
                 this._activeHtmlAudio = audio;
                 return await new Promise((resolve) => {
@@ -443,8 +491,14 @@ export class StoryAudioEngine {
                         if (settled) return;
                         settled = true;
                         this._clearTimers();
+                        audio.onended = null;
+                        audio.onerror = null;
+                        if (!ok) {
+                            try { audio.pause(); } catch (_) {}
+                        }
+                        this._revokeActiveObjectUrl();
                         if (this._activeHtmlAudio === audio) this._activeHtmlAudio = null;
-                        resolve({ played: ok, mode: ok ? 'neural-mp3' : 'blocked' });
+                        resolve({ played: ok, mode: ok ? 'neural-mp3' : 'blocked', reason: ok ? undefined : 'autoplay_blocked' });
                     };
                     audio.onended = () => done(true);
                     audio.onerror = () => done(false);
@@ -458,6 +512,7 @@ export class StoryAudioEngine {
                 });
             }
         } catch (_) {
+            this._revokeActiveObjectUrl();
             this._activeHtmlAudio = null;
         }
 
@@ -513,10 +568,15 @@ export class StoryAudioEngine {
         if (!cleanText || this.muted) {
             return { ok: false, mode: 'idle', cancelled: false };
         }
+        if (this.isSpeaking && this._currentSpeakText === cleanText && (Date.now() - this._currentSpeakAt) < 800) {
+            return { ok: true, mode: this.lastPlaybackMode || 'idle', cancelled: false, deduped: true };
+        }
 
         this.stop();
         const token = ++this._speakToken;
         this.isSpeaking = true;
+        this._currentSpeakText = cleanText;
+        this._currentSpeakAt = Date.now();
         this.lastPlaybackMode = 'idle';
         this._pendingGesturePlay = null;
         this._notify();
@@ -531,6 +591,7 @@ export class StoryAudioEngine {
         const finalize = (result) => {
             if (token === this._speakToken) {
                 this.isSpeaking = false;
+                this._currentSpeakText = '';
                 if (this._activeResolve) {
                     const resFn = this._activeResolve;
                     this._activeResolve = null;
@@ -551,8 +612,9 @@ export class StoryAudioEngine {
                     return;
                 }
 
+                let cloudRes = null;
                 if (b64) {
-                    const cloudRes = await this._playBase64AndAwaitEnd(b64, token);
+                    cloudRes = await this._playBase64AndAwaitEnd(b64, token);
                     if (token !== this._speakToken || this.muted) {
                         finalize({ ok: true, mode: this.lastPlaybackMode, cancelled: true });
                         return;
@@ -561,13 +623,12 @@ export class StoryAudioEngine {
                         finalize({ ok: true, mode: cloudRes.mode, cancelled: false });
                         return;
                     }
-                    // 若首次加载尚未点击屏幕被 Safari 拦截，暂存待手势触发，同时尝试本地语音
-                    if (cloudRes.reason === 'autoplay_blocked') {
-                        this._pendingGesturePlay = { text: cleanText, role, callbacks: {} };
-                    }
                 }
 
                 const localRes = await this._playLocalSpeechAndAwaitEnd(cleanText, role, token);
+                if (token === this._speakToken && !this.muted && !localRes.played && cloudRes?.reason === 'autoplay_blocked') {
+                    this._pendingGesturePlay = { text: cleanText, role, callbacks: {}, expiresAt: Date.now() + 10000 };
+                }
                 finalize({
                     ok: Boolean(localRes.played),
                     mode: localRes.mode || 'idle',
@@ -590,12 +651,16 @@ export class StoryAudioEngine {
         if (this.muted) {
             return { ok: false, mode: 'idle', cancelled: false };
         }
+        const dedupeKey = cleanFallback || cleanB64.slice(0, 64);
+        if (dedupeKey && this.isSpeaking && this._currentSpeakText === dedupeKey && (Date.now() - this._currentSpeakAt) < 800) {
+            return { ok: true, mode: this.lastPlaybackMode || 'idle', cancelled: false, deduped: true };
+        }
         if (!cleanB64) {
             return cleanFallback ? this.speak(cleanFallback, role, callbacks) : { ok: false, mode: 'idle', cancelled: false };
         }
 
         if (cleanFallback) {
-            const cacheKey = `${role}::${cleanFallback}`;
+            const cacheKey = this._buildCacheKey(role, cleanFallback);
             this._saveToMemCache(cacheKey, cleanB64);
             this._writeDiskCache(cacheKey, cleanB64).catch(() => {});
         }
@@ -603,6 +668,8 @@ export class StoryAudioEngine {
         this.stop();
         const token = ++this._speakToken;
         this.isSpeaking = true;
+        this._currentSpeakText = dedupeKey;
+        this._currentSpeakAt = Date.now();
         this.lastPlaybackMode = 'idle';
         this._pendingGesturePlay = null;
         this._notify();
@@ -617,6 +684,7 @@ export class StoryAudioEngine {
         const finalize = (result) => {
             if (token === this._speakToken) {
                 this.isSpeaking = false;
+                this._currentSpeakText = '';
                 if (this._activeResolve) {
                     const resFn = this._activeResolve;
                     this._activeResolve = null;

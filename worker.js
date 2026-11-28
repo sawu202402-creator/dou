@@ -9,6 +9,7 @@
  */
 import { DurableObject } from "cloudflare:workers";
 import { ROLE_NEURAL_VOICES, getRoleVoiceProfile, stripSpeechTextForTts, synthesizeNeuralMp3Base64 } from "./edgeTtsMod.js";
+import { VoiceNotFoundError, enrollClonedVoice, getVoiceCloneConfig, synthesizeClonedSpeech } from "./voiceCloneMod.js";
 
 const CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -40,6 +41,65 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
 function cleanStr(val, maxLen = 600) {
     if (val === undefined || val === null) return "";
     return String(val).trim().slice(0, maxLen);
+}
+
+function sanitizeVoiceRole(raw) {
+    const clean = cleanStr(raw, 32).replace(/[^a-zA-Z0-9_-]/g, "");
+    return clean || "pea";
+}
+
+async function runClonedTtsWithEnroll({ vcCfg, cleanText, profile, syncFn }) {
+    let providerVoiceId = vcCfg.overrideVoiceId || (profile.provider === vcCfg.provider ? cleanStr(profile.providerVoiceId, 260) : "");
+    if (!providerVoiceId) {
+        if (!profile.hasSample) {
+            throw new VoiceNotFoundError("missing_voice_sample");
+        }
+        providerVoiceId = await enrollClonedVoice(vcCfg, {
+            sampleAudioB64: profile.sampleAudioB64,
+            sampleMime: profile.sampleMime,
+            sampleText: profile.sampleText,
+            version: profile.version || 1
+        });
+        await syncFn({
+            provider: vcCfg.provider,
+            providerVoiceId,
+            syncedAt: Date.now(),
+            lastError: ""
+        });
+    }
+
+    try {
+        const res = await synthesizeClonedSpeech(vcCfg, {
+            text: cleanText,
+            providerVoiceId,
+            sampleAudioB64: profile.sampleAudioB64,
+            sampleText: profile.sampleText
+        });
+        return { audioBase64: res.audioBase64, providerVoiceId };
+    } catch (err) {
+        if (err instanceof VoiceNotFoundError && !vcCfg.overrideVoiceId && profile.hasSample) {
+            const refreshedId = await enrollClonedVoice(vcCfg, {
+                sampleAudioB64: profile.sampleAudioB64,
+                sampleMime: profile.sampleMime,
+                sampleText: profile.sampleText,
+                version: profile.version || 1
+            });
+            await syncFn({
+                provider: vcCfg.provider,
+                providerVoiceId: refreshedId,
+                syncedAt: Date.now(),
+                lastError: ""
+            });
+            const retryRes = await synthesizeClonedSpeech(vcCfg, {
+                text: cleanText,
+                providerVoiceId: refreshedId,
+                sampleAudioB64: profile.sampleAudioB64,
+                sampleText: profile.sampleText
+            });
+            return { audioBase64: retryRes.audioBase64, providerVoiceId: refreshedId };
+        }
+        throw err;
+    }
 }
 
 function safeParseJson(str) {
@@ -392,11 +452,81 @@ export class StoryMailboxDO extends DurableObject {
                     value TEXT NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS voice_profiles (
+                    role TEXT PRIMARY KEY,
+                    sample_audio_b64 TEXT NOT NULL,
+                    sample_mime TEXT DEFAULT 'audio/wav',
+                    sample_text TEXT DEFAULT '',
+                    duration_ms INTEGER DEFAULT 0,
+                    enabled INTEGER DEFAULT 1,
+                    version INTEGER DEFAULT 1,
+                    provider TEXT DEFAULT '',
+                    provider_voice_id TEXT DEFAULT '',
+                    provider_synced_at INTEGER DEFAULT 0,
+                    last_error TEXT DEFAULT '',
+                    updated_at INTEGER NOT NULL,
+                    updated_str TEXT NOT NULL
+                );
             `);
             try {
                 this.ctx.storage.sql.exec(`ALTER TABLE story_wishes ADD COLUMN target_json TEXT DEFAULT ''`);
             } catch (_) {}
         });
+    }
+
+    _getVoiceProfileRow(role = "pea") {
+        const cleanRole = sanitizeVoiceRole(role);
+        const rows = this.ctx.storage.sql.exec(
+            `SELECT role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version,
+                    provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str
+             FROM voice_profiles WHERE role = ? LIMIT 1`,
+            cleanRole
+        ).toArray();
+        return rows[0] || null;
+    }
+
+    _formatPublicVoiceProfile(row, role = "pea") {
+        const cleanRole = sanitizeVoiceRole(role);
+        const vc = getVoiceCloneConfig(this.env);
+        const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
+        const enabled = row ? Number(row.enabled) !== 0 : Boolean(vc.overrideVoiceId);
+        const providerVoiceSynced = Boolean(
+            vc.configured &&
+            (vc.overrideVoiceId || (hasSample && row?.provider === vc.provider && cleanStr(row?.provider_voice_id, 260)))
+        );
+        const cloneReady = Boolean(vc.configured && enabled && (hasSample || vc.overrideVoiceId));
+        return {
+            role: cleanRole,
+            hasSample,
+            enabled: (hasSample || Boolean(vc.overrideVoiceId)) ? enabled : false,
+            version: row ? Number(row.version) || 1 : 0,
+            durationMs: row ? Number(row.duration_ms) || 0 : 0,
+            sampleText: row ? cleanStr(row.sample_text, 400) : "",
+            sampleMime: row ? (cleanStr(row.sample_mime, 64) || "audio/wav") : "audio/wav",
+            updatedAt: row ? Number(row.updated_at) || 0 : 0,
+            updatedStr: row ? cleanStr(row.updated_str, 32) : "",
+            cloneReady,
+            provider: vc.provider,
+            providerLabel: vc.providerLabel,
+            providerConfigured: vc.configured,
+            providerVoiceSynced,
+            overrideVoiceConfigured: Boolean(vc.overrideVoiceId),
+            lastError: row ? cleanStr(row.last_error, 260) : ""
+        };
+    }
+
+    _updateVoiceSyncMetadata(role, { provider = "", providerVoiceId = "", syncedAt = 0, lastError = "" } = {}) {
+        const cleanRole = sanitizeVoiceRole(role);
+        this.ctx.storage.sql.exec(
+            `UPDATE voice_profiles
+             SET provider = ?, provider_voice_id = ?, provider_synced_at = ?, last_error = ?
+             WHERE role = ?`,
+            cleanStr(provider, 40),
+            cleanStr(providerVoiceId, 260),
+            Number(syncedAt) || 0,
+            cleanStr(lastError, 260),
+            cleanRole
+        );
     }
 
     _getSetting(key, defaultValue = "") {
@@ -790,6 +920,256 @@ export class StoryMailboxDO extends DurableObject {
                 return jsonResponse({ ok: true, wishes, replies, serverTime: Date.now() });
             }
 
+            if (path.startsWith("/api/voice-profile")) {
+                const role = sanitizeVoiceRole(url.searchParams.get("role"));
+
+                if (request.method === "GET" && path === "/api/voice-profile") {
+                    const row = this._getVoiceProfileRow(role);
+                    return jsonResponse({ ok: true, profile: this._formatPublicVoiceProfile(row, role) });
+                }
+
+                if (request.method === "GET" && path === "/api/voice-profile/sample") {
+                    const row = this._getVoiceProfileRow(role);
+                    const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
+                    return jsonResponse({
+                        ok: true,
+                        role,
+                        hasSample,
+                        audioBase64: hasSample ? row.sample_audio_b64 : "",
+                        sampleMime: row ? (cleanStr(row.sample_mime, 64) || "audio/wav") : "audio/wav",
+                        durationMs: row ? Number(row.duration_ms) || 0 : 0,
+                        sampleText: row ? cleanStr(row.sample_text, 400) : "",
+                        version: row ? Number(row.version) || 1 : 0
+                    });
+                }
+
+                if (request.method === "GET" && path === "/api/voice-profile/internal-raw") {
+                    if (request.headers.get("X-Internal-Worker") !== "pea-internal") {
+                        return jsonResponse({ ok: false, error: "forbidden" }, 403);
+                    }
+                    const row = this._getVoiceProfileRow(role);
+                    const vc = getVoiceCloneConfig(this.env);
+                    const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
+                    const enabled = row ? Number(row.enabled) !== 0 : Boolean(vc.overrideVoiceId);
+                    return jsonResponse({
+                        ok: true,
+                        role,
+                        hasSample,
+                        sampleAudioB64: hasSample ? row.sample_audio_b64 : "",
+                        sampleMime: row ? (cleanStr(row.sample_mime, 64) || "audio/wav") : "audio/wav",
+                        sampleText: row ? cleanStr(row.sample_text, 400) : "",
+                        enabled: (hasSample || Boolean(vc.overrideVoiceId)) ? enabled : false,
+                        version: row ? Number(row.version) || 1 : 0,
+                        provider: row ? cleanStr(row.provider, 40) : "",
+                        providerVoiceId: row ? cleanStr(row.provider_voice_id, 260) : ""
+                    });
+                }
+
+                if (request.method === "POST" && path === "/api/voice-profile/internal-sync") {
+                    if (request.headers.get("X-Internal-Worker") !== "pea-internal") {
+                        return jsonResponse({ ok: false, error: "forbidden" }, 403);
+                    }
+                    const body = await request.json().catch(() => ({}));
+                    const syncRole = sanitizeVoiceRole(body.role || role);
+                    this._updateVoiceSyncMetadata(syncRole, {
+                        provider: body.provider || "",
+                        providerVoiceId: body.providerVoiceId || "",
+                        syncedAt: Number(body.syncedAt) || 0,
+                        lastError: body.lastError || ""
+                    });
+                    return jsonResponse({ ok: true });
+                }
+
+                if (request.method === "POST" && path === "/api/voice-profile") {
+                    const body = await request.json().catch(() => ({}));
+                    const targetRole = sanitizeVoiceRole(body.role || role);
+                    const rawB64 = String(body.audioBase64 || "").replace(/^data:audio\/[^;]+;base64,/, "").trim();
+                    if (rawB64.length < 2000 || rawB64.length > 1_400_000) {
+                        return jsonResponse({ ok: false, error: "invalid_sample_audio" }, 400);
+                    }
+                    const sampleMime = cleanStr(body.sampleMime, 64) || "audio/wav";
+                    const sampleText = cleanStr(body.sampleText, 400) || "大家好，我是小豌豆！欢迎来到我的魔法故事漫画屋！";
+                    const durationMs = Math.max(1500, Math.min(25000, Math.floor(Number(body.durationMs) || 10000)));
+                    const prev = this._getVoiceProfileRow(targetRole);
+                    const nextVersion = (prev ? Number(prev.version) || 0 : 0) + 1;
+                    const now = Date.now();
+                    const updatedStr = formatBeijingTimeStr(now);
+
+                    this.ctx.storage.sql.exec(
+                        `INSERT INTO voice_profiles
+                            (role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version, provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str)
+                         VALUES (?, ?, ?, ?, ?, 1, ?, '', '', 0, '', ?, ?)
+                         ON CONFLICT(role) DO UPDATE SET
+                            sample_audio_b64 = excluded.sample_audio_b64,
+                            sample_mime = excluded.sample_mime,
+                            sample_text = excluded.sample_text,
+                            duration_ms = excluded.duration_ms,
+                            enabled = 1,
+                            version = excluded.version,
+                            provider = '',
+                            provider_voice_id = '',
+                            provider_synced_at = 0,
+                            last_error = '',
+                            updated_at = excluded.updated_at,
+                            updated_str = excluded.updated_str`,
+                        targetRole, rawB64, sampleMime, sampleText, durationMs, nextVersion, now, updatedStr
+                    );
+
+                    const vc = getVoiceCloneConfig(this.env);
+                    if (vc.configured) {
+                        try {
+                            const providerVoiceId = await enrollClonedVoice(vc, {
+                                sampleAudioB64: rawB64,
+                                sampleMime,
+                                sampleText,
+                                version: nextVersion
+                            });
+                            this._updateVoiceSyncMetadata(targetRole, {
+                                provider: vc.provider,
+                                providerVoiceId,
+                                syncedAt: Date.now(),
+                                lastError: ""
+                            });
+                        } catch (err) {
+                            this._updateVoiceSyncMetadata(targetRole, {
+                                provider: vc.provider,
+                                providerVoiceId: "",
+                                syncedAt: 0,
+                                lastError: err?.message || String(err)
+                            });
+                        }
+                    }
+
+                    const saved = this._getVoiceProfileRow(targetRole);
+                    return jsonResponse({ ok: true, profile: this._formatPublicVoiceProfile(saved, targetRole) });
+                }
+
+                if (request.method === "POST" && path === "/api/voice-profile/toggle") {
+                    const body = await request.json().catch(() => ({}));
+                    if (typeof body.enabled !== "boolean") {
+                        return jsonResponse({ ok: false, error: "invalid_enabled" }, 400);
+                    }
+                    const targetRole = sanitizeVoiceRole(body.role || role);
+                    const vc = getVoiceCloneConfig(this.env);
+                    const prev = this._getVoiceProfileRow(targetRole);
+                    const now = Date.now();
+                    const updatedStr = formatBeijingTimeStr(now);
+                    const enabledVal = body.enabled ? 1 : 0;
+
+                    if (!prev) {
+                        if (!vc.overrideVoiceId) {
+                            return jsonResponse({ ok: false, error: "voice_profile_not_found" }, 404);
+                        }
+                        this.ctx.storage.sql.exec(
+                            `INSERT INTO voice_profiles
+                                (role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version, provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str)
+                             VALUES (?, '', 'audio/wav', '', 0, ?, 1, ?, ?, ?, '', ?, ?)`,
+                            targetRole, enabledVal, vc.provider, vc.overrideVoiceId, now, now, updatedStr
+                        );
+                    } else {
+                        this.ctx.storage.sql.exec(
+                            `UPDATE voice_profiles SET enabled = ?, updated_at = ?, updated_str = ? WHERE role = ?`,
+                            enabledVal, now, updatedStr, targetRole
+                        );
+                    }
+                    const updated = this._getVoiceProfileRow(targetRole);
+                    return jsonResponse({ ok: true, profile: this._formatPublicVoiceProfile(updated, targetRole) });
+                }
+
+                if (request.method === "POST" && path === "/api/voice-profile/delete") {
+                    const body = await request.json().catch(() => ({}));
+                    const targetRole = sanitizeVoiceRole(body.role || role);
+                    this.ctx.storage.sql.exec(`DELETE FROM voice_profiles WHERE role = ?`, targetRole);
+                    return jsonResponse({ ok: true, profile: this._formatPublicVoiceProfile(null, targetRole) });
+                }
+
+                if (request.method === "POST" && path === "/api/voice-profile/test") {
+                    const body = await request.json().catch(() => ({}));
+                    const targetRole = sanitizeVoiceRole(body.role || role);
+                    const cleanText = stripSpeechTextForTts(cleanStr(body.text, 240)) || "大家好，我是小豌豆！现在每一本故事书里都是我自己的声音啦！";
+                    const row = this._getVoiceProfileRow(targetRole);
+                    const vc = getVoiceCloneConfig(this.env);
+                    const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
+
+                    if (!hasSample && !vc.overrideVoiceId) {
+                        return jsonResponse({
+                            ok: true,
+                            mode: "unconfigured",
+                            audioBase64: "",
+                            message: "还没有录制小豌豆的声音样本哦，先按中间的录音按钮念一段吧！",
+                            profile: this._formatPublicVoiceProfile(row, targetRole)
+                        });
+                    }
+                    if (!vc.configured) {
+                        return jsonResponse({
+                            ok: true,
+                            mode: "unconfigured",
+                            audioBase64: "",
+                            message: "小豌豆原声已经安全存好！还需爸爸妈妈在 Cloudflare 后台配置 VOICE_CLONE_API_KEY 密钥才能开启 AI 克隆试听哦。",
+                            profile: this._formatPublicVoiceProfile(row, targetRole)
+                        });
+                    }
+                    if (row && Number(row.enabled) === 0) {
+                        return jsonResponse({
+                            ok: true,
+                            mode: "disabled",
+                            audioBase64: "",
+                            message: "当前已暂停使用专属声音，打开上面的启用开关就能试听啦。",
+                            profile: this._formatPublicVoiceProfile(row, targetRole)
+                        });
+                    }
+
+                    try {
+                        const res = await runClonedTtsWithEnroll({
+                            vcCfg: vc,
+                            cleanText,
+                            profile: {
+                                hasSample,
+                                sampleAudioB64: hasSample ? row.sample_audio_b64 : "",
+                                sampleMime: row?.sample_mime || "audio/wav",
+                                sampleText: row?.sample_text || "",
+                                version: row ? Number(row.version) || 1 : 1,
+                                provider: row?.provider || "",
+                                providerVoiceId: row?.provider_voice_id || ""
+                            },
+                            syncFn: async (meta) => {
+                                if (row) this._updateVoiceSyncMetadata(targetRole, meta);
+                            }
+                        });
+                        const freshRow = this._getVoiceProfileRow(targetRole);
+                        return jsonResponse({
+                            ok: true,
+                            mode: "cloned",
+                            audioBase64: res.audioBase64,
+                            message: `太棒啦！已用【${vc.providerLabel}】为你实时合成试听！`,
+                            profile: this._formatPublicVoiceProfile(freshRow, targetRole)
+                        });
+                    } catch (err) {
+                        const errMsg = cleanStr(err?.message || err, 260);
+                        if (row) {
+                            this._updateVoiceSyncMetadata(targetRole, {
+                                provider: vc.provider,
+                                providerVoiceId: row.provider_voice_id || "",
+                                syncedAt: Number(row.provider_synced_at) || 0,
+                                lastError: errMsg
+                            });
+                        }
+                        let fallbackAudio = "";
+                        try {
+                            fallbackAudio = await synthesizeNeuralMp3Base64(cleanText, targetRole);
+                        } catch (_) {}
+                        const freshRow = this._getVoiceProfileRow(targetRole);
+                        return jsonResponse({
+                            ok: true,
+                            mode: "fallback",
+                            audioBase64: fallbackAudio,
+                            message: `克隆接口暂时没有联通（${errMsg.slice(0, 70)}），先用默认声音为你播报～`,
+                            profile: this._formatPublicVoiceProfile(freshRow, targetRole)
+                        });
+                    }
+                }
+            }
+
             return jsonResponse({ ok: false, error: "not_found" }, 404);
         } catch (err) {
             return jsonResponse({ ok: false, error: String(err && err.message ? err.message : err) }, 500);
@@ -805,13 +1185,24 @@ export default {
             return new Response(null, { status: 204, headers: CORS_HEADERS });
         }
 
+        // 严禁外部请求伪造 Worker 内部接口或内部头
+        if (url.pathname.includes("/internal-")) {
+            return jsonResponse({ ok: false, error: "forbidden" }, 403);
+        }
+
         if (url.pathname === "/api/health" && request.method === "GET") {
+            const vc = getVoiceCloneConfig(env);
             return jsonResponse({
                 ok: true,
                 service: "pea-story-house",
                 voices: Object.keys(ROLE_NEURAL_VOICES),
                 ai: Boolean(env?.AI),
-                mailbox: Boolean(env?.STORY_MAILBOX)
+                mailbox: Boolean(env?.STORY_MAILBOX),
+                voiceClone: {
+                    configured: vc.configured,
+                    provider: vc.provider,
+                    providerLabel: vc.providerLabel
+                }
             });
         }
 
@@ -826,6 +1217,124 @@ export default {
                         return jsonResponse({ ok: false, error: "empty_text" }, 400);
                     }
 
+                    const edgeCache = typeof caches !== "undefined" ? caches.default : null;
+                    const vcCfg = role === "pea" ? getVoiceCloneConfig(env) : null;
+
+                    if (role === "pea" && vcCfg && vcCfg.configured && env?.STORY_MAILBOX) {
+                        try {
+                            const id = env.STORY_MAILBOX.idFromName("pea-story-house-mailbox-v1");
+                            const stub = env.STORY_MAILBOX.get(id);
+                            const rawRes = await stub.fetch("https://mailbox.internal/api/voice-profile/internal-raw?role=pea", {
+                                headers: { "X-Internal-Worker": "pea-internal" }
+                            });
+                            const rawProfile = rawRes.ok ? await rawRes.json().catch(() => null) : null;
+
+                            if (rawProfile && rawProfile.ok && rawProfile.enabled && (rawProfile.hasSample || vcCfg.overrideVoiceId)) {
+                                const cloneHash = await sha256Hex(JSON.stringify({
+                                    v: 2,
+                                    source: "clone",
+                                    provider: vcCfg.provider,
+                                    model: vcCfg.model,
+                                    voiceVersion: rawProfile.version || 0,
+                                    overrideVoiceId: vcCfg.overrideVoiceId,
+                                    text: cleanText
+                                }));
+                                const cloneCacheReq = new Request(`https://tts-cache.pea-story-house.internal/v2/${cloneHash}`, { method: "GET" });
+
+                                if (edgeCache) {
+                                    try {
+                                        const cloneHit = await edgeCache.match(cloneCacheReq);
+                                        if (cloneHit) {
+                                            const hitText = await cloneHit.text();
+                                            return new Response(hitText, {
+                                                status: 200,
+                                                headers: {
+                                                    "Content-Type": "application/json; charset=utf-8",
+                                                    "Cache-Control": "no-store, no-cache, must-revalidate",
+                                                    "X-TTS-Cache": "HIT",
+                                                    "X-Voice-Source": "cloned",
+                                                    ...CORS_HEADERS
+                                                }
+                                            });
+                                        }
+                                    } catch (_) {}
+                                }
+
+                                const cloned = await runClonedTtsWithEnroll({
+                                    vcCfg,
+                                    cleanText,
+                                    profile: rawProfile,
+                                    syncFn: async (meta) => {
+                                        await stub.fetch("https://mailbox.internal/api/voice-profile/internal-sync", {
+                                            method: "POST",
+                                            headers: {
+                                                "Content-Type": "application/json",
+                                                "X-Internal-Worker": "pea-internal"
+                                            },
+                                            body: JSON.stringify({ role: "pea", ...meta })
+                                        }).catch(() => {});
+                                    }
+                                });
+
+                                if (cloned && cloned.audioBase64) {
+                                    const clonePayload = JSON.stringify({
+                                        ok: true,
+                                        role,
+                                        voiceSource: "cloned",
+                                        provider: vcCfg.provider,
+                                        voiceVersion: rawProfile.version || 1,
+                                        audioBase64: cloned.audioBase64
+                                    });
+                                    if (edgeCache) {
+                                        try {
+                                            const cacheResp = new Response(clonePayload, {
+                                                status: 200,
+                                                headers: {
+                                                    "Content-Type": "application/json; charset=utf-8",
+                                                    "Cache-Control": "public, max-age=604800"
+                                                }
+                                            });
+                                            const putPromise = edgeCache.put(cloneCacheReq, cacheResp).catch(() => {});
+                                            if (ctx && typeof ctx.waitUntil === "function") {
+                                                ctx.waitUntil(putPromise);
+                                            }
+                                        } catch (_) {}
+                                    }
+                                    return new Response(clonePayload, {
+                                        status: 200,
+                                        headers: {
+                                            "Content-Type": "application/json; charset=utf-8",
+                                            "Cache-Control": "no-store, no-cache, must-revalidate",
+                                            "X-TTS-Cache": "MISS",
+                                            "X-Voice-Source": "cloned",
+                                            ...CORS_HEADERS
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (cloneErr) {
+                            try {
+                                const id = env.STORY_MAILBOX.idFromName("pea-story-house-mailbox-v1");
+                                const stub = env.STORY_MAILBOX.get(id);
+                                const errPromise = stub.fetch("https://mailbox.internal/api/voice-profile/internal-sync", {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "X-Internal-Worker": "pea-internal"
+                                    },
+                                    body: JSON.stringify({
+                                        role: "pea",
+                                        provider: vcCfg.provider,
+                                        lastError: cloneErr?.message || String(cloneErr)
+                                    })
+                                }).catch(() => {});
+                                if (ctx && typeof ctx.waitUntil === "function") {
+                                    ctx.waitUntil(errPromise);
+                                }
+                            } catch (_) {}
+                        }
+                    }
+
                     const prof = getRoleVoiceProfile(role);
                     const cacheHash = await sha256Hex(JSON.stringify({
                         v: 1,
@@ -835,7 +1344,6 @@ export default {
                         text: cleanText
                     }));
                     const cacheReq = new Request(`https://tts-cache.pea-story-house.internal/v1/${cacheHash}`, { method: "GET" });
-                    const edgeCache = typeof caches !== "undefined" ? caches.default : null;
 
                     if (edgeCache) {
                         try {
@@ -848,6 +1356,7 @@ export default {
                                         "Content-Type": "application/json; charset=utf-8",
                                         "Cache-Control": "no-store, no-cache, must-revalidate",
                                         "X-TTS-Cache": "HIT",
+                                        "X-Voice-Source": "neural",
                                         ...CORS_HEADERS
                                     }
                                 });
@@ -856,7 +1365,7 @@ export default {
                     }
 
                     const audioBase64 = await synthesizeNeuralMp3Base64(cleanText, role);
-                    const payloadStr = JSON.stringify({ ok: true, role, audioBase64 });
+                    const payloadStr = JSON.stringify({ ok: true, role, voiceSource: "neural", audioBase64 });
 
                     if (edgeCache && audioBase64) {
                         try {
@@ -880,6 +1389,7 @@ export default {
                             "Content-Type": "application/json; charset=utf-8",
                             "Cache-Control": "no-store, no-cache, must-revalidate",
                             "X-TTS-Cache": "MISS",
+                            "X-Voice-Source": "neural",
                             ...CORS_HEADERS
                         }
                     });
@@ -891,6 +1401,22 @@ export default {
                 }
             }
             return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
+        }
+
+        if (url.pathname.startsWith("/api/voice-profile")) {
+            if (env && env.STORY_MAILBOX) {
+                const fwdHeaders = new Headers(request.headers);
+                fwdHeaders.delete("X-Internal-Worker");
+                const cleanReq = new Request(request.url, {
+                    method: request.method,
+                    headers: fwdHeaders,
+                    body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body
+                });
+                const id = env.STORY_MAILBOX.idFromName("pea-story-house-mailbox-v1");
+                const stub = env.STORY_MAILBOX.get(id);
+                return stub.fetch(cleanReq);
+            }
+            return jsonResponse({ ok: false, error: "mailbox_binding_unavailable" }, 503);
         }
 
         if (url.pathname.startsWith("/api/mailbox")) {

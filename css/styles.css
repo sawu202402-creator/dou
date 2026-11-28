@@ -360,6 +360,31 @@ button {
     box-shadow: 0 2px 0 #F5A3BF;
 }
 
+.btn-voice-studio {
+    background: linear-gradient(135deg, #E8FBF8 0%, #EFF4FF 100%);
+    border-color: #79DDD0;
+    color: #136B63;
+    box-shadow: 0 2px 0 #9AE6DC;
+}
+
+.voice-studio-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #CBBBA6;
+    flex-shrink: 0;
+}
+
+.voice-studio-dot.is-ready {
+    background: #20C997;
+    box-shadow: 0 0 0 2px rgba(32, 201, 151, 0.25);
+}
+
+.voice-studio-dot.is-pending {
+    background: #F59F00;
+    box-shadow: 0 0 0 2px rgba(245, 159, 0, 0.25);
+}
+
 .unread-badge {
     display: inline-flex;
     align-items: center;
@@ -498,6 +523,31 @@ button {
     margin: 0;
     font-size: 0.9rem;
     color: var(--ink-soft);
+}
+
+.shelf-hero-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-shelf-voice {
+    min-height: 36px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #E6FBF7 0%, #EFEAFF 100%);
+    border: 2px solid #79DDD0;
+    box-shadow: 0 2px 0 #9AE6DC;
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: #126A61;
+    white-space: nowrap;
+}
+
+.btn-shelf-voice.is-ready {
+    background: linear-gradient(135deg, #DDF9F2 0%, #E7F3FF 100%);
+    border-color: #20C997;
 }
 
 .shelf-count-badge {

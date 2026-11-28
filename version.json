@@ -1,10 +1,10 @@
 {
-  "version": "2026.11.28.001",
-  "updatedAt": "2026-11-28T12:13:30+05:30",
+  "version": "2026.11.28.002",
+  "updatedAt": "2026-11-28T12:38:30+05:30",
   "latestBookId": "chinese-reading-notebook",
   "latestPage": 1,
-  "changeType": "new_book",
-  "summary": "上线新书：《小豌豆的中国好文章积累本》",
+  "changeType": "updated_book",
+  "summary": "上线「我的声音」AI 声线克隆录音台（内置 3 平台适配器）并修复回复声音重复播放",
   "silent": false,
-  "announcement": "小豌豆！你的《中国好文章积累本》已经做好摆上书架啦，收进了朱自清、萧红、老舍和丰子恺的四篇美文，以后还能一直添新篇哦！"
+  "announcement": "小豌豆！你的专属声音魔法室上线啦！快点上面「我的声音」录一段15秒朗读，以后每本书里的小豌豆都会变成你的声音哦！"
 }

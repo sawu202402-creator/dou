@@ -16,6 +16,7 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/mailbox.css">
+    <link rel="stylesheet" href="css/voiceStudio.css">
 </head>
 <body>
     <div id="app" class="app-shell" data-view="shelf" data-mode="storybook" data-pinyin="on">
@@ -61,6 +62,12 @@
                 <button type="button" id="btn-speed" class="ctrl-pill btn-speed" hidden aria-pressed="false" title="切换正常语速或二年级慢速跟读">
                     <span id="speed-icon">🐇</span>
                     <span id="speed-label">常速</span>
+                </button>
+
+                <button type="button" id="btn-open-voice-studio" class="ctrl-pill btn-voice-studio" title="录一段小豌豆真实声音，让所有故事书里的我都变成你的声线！">
+                    <span>🎙️</span>
+                    <span>我的声音</span>
+                    <span id="voice-studio-dot" class="voice-studio-dot" aria-hidden="true"></span>
                 </button>
 
                 <button type="button" id="btn-open-mailbox" class="ctrl-pill btn-mailbox" title="跟魔法画师说话，告诉她你想画什么新故事！">

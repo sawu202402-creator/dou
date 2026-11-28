@@ -153,6 +153,8 @@ export class StoryMailboxController {
         this.isSending = false;
         this._thinkingWishId = null;
         this._playingKey = '';
+        this._sendLock = false;
+        this._announcedReplyIds = new Set();
 
         this._recorder = null;
         this._recognition = null;
@@ -1027,8 +1029,26 @@ export class StoryMailboxController {
         });
     }
 
+    markBookRepliesAnnounced(bookId = '') {
+        const now = Date.now();
+        for (const r of (this.cloudReplies || [])) {
+            if (!r || !r.id) continue;
+            const matchBook = Boolean(bookId && r.bookId === bookId);
+            const isRecent = (Number(r.createdAt) || 0) >= (now - 180_000);
+            if (matchBook || isRecent) {
+                this._announcedReplyIds.add(r.id);
+            }
+        }
+    }
+
     open(presetTarget = null) {
         this._ensureModalDom();
+        if (this.isOpen) {
+            if (presetTarget && typeof presetTarget === 'object') {
+                this._setEditTarget(presetTarget);
+            }
+            return;
+        }
         this.onBeforeOpen();
         this.isOpen = true;
 
@@ -1058,13 +1078,14 @@ export class StoryMailboxController {
         this.renderTimeline({ forceScroll: true });
         this._syncActionButtons();
 
-        this.syncFromCloud().catch(() => {});
+        this.syncFromCloud({ suppressNewReplyCallback: true }).catch(() => {});
 
-        // 若有未读正式回信自动朗读最新一封；否则首次打开自动播欢迎语
-        if (unread.length > 0) {
-            const newest = unread[unread.length - 1];
+        const unannounced = unread.filter((r) => r?.id && !this._announcedReplyIds.has(r.id));
+        if (unannounced.length > 0) {
+            const newest = unannounced[unannounced.length - 1];
+            unannounced.forEach((r) => this._announcedReplyIds.add(r.id));
             this._playVoiceItem(`reply_${newest.id}`, newest.text, 'narrator');
-        } else if (!this.state.welcomePlayed) {
+        } else if (!this.state.welcomePlayed && !this.audioEngine?.isSpeaking) {
             this.state.welcomePlayed = true;
             this._saveLocalState();
             this._playVoiceItem(WELCOME_MSG.id, WELCOME_MSG.text, 'narrator');
@@ -1544,51 +1565,52 @@ export class StoryMailboxController {
 
     /* ==================== 发送留言 & 实时 AI 陪聊语音回复 ==================== */
     async sendWish() {
-        if (this.isSending || this.isTranscribing) return;
-        if (this.isRecording) {
-            await this.stopRecording({ transcribeNow: true });
-        }
-
-        const text = this.dom.textInput.value.trim();
-        if (!text) {
-            this.dom.statusHint.textContent = '💡 先按大话筒说话，或者打字写出你想画的故事再发送哦！';
-            this.dom.textInput.focus();
-            return;
-        }
-
-        const ctx = this.getContext() || {};
-        const t = this.editTarget || {};
-        const targetPayload = this._buildWishTargetPayload();
-        const pageContext = this._buildPageContextForAi();
-        const wish = {
-            id: `wish_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            kidName: '小豌豆',
-            bookId: t.bookId || '',
-            bookTitle: t.bookTitle || '',
-            pageNumber: t.bookId ? (t.pageNumber || 1) : 1,
-            mode: t.bookId ? (t.mode || 'storybook') : 'shelf',
-            text,
-            target: targetPayload,
-            instantReplyKey: '',
-            instantReplyText: '',
-            status: 'pending',
-            syncedCloud: false,
-            createdAt: Date.now(),
-            createdStr: nowTimeStr()
-        };
-
-        this.isSending = true;
-        this._dispatchedWishKey = '';
-        this._thinkingWishId = wish.id;
-        this.state.wishes.push(wish);
-        this.dom.textInput.value = '';
-        this._saveLocalState();
-        this._syncActionButtons();
-        this._renderDispatchBar();
-        this.renderTimeline({ forceScroll: true });
-        this.dom.statusHint.textContent = '🔮 魔法画师正在认真听你的点子…';
-
+        if (this._sendLock || this.isSending || this.isTranscribing) return;
+        this._sendLock = true;
+        let wish = null;
         try {
+            if (this.isRecording) {
+                await this.stopRecording({ transcribeNow: true });
+            }
+
+            const text = this.dom.textInput.value.trim();
+            if (!text) {
+                this.dom.statusHint.textContent = '💡 先按大话筒说话，或者打字写出你想画的故事再发送哦！';
+                this.dom.textInput.focus();
+                return;
+            }
+
+            const t = this.editTarget || {};
+            const targetPayload = this._buildWishTargetPayload();
+            const pageContext = this._buildPageContextForAi();
+            wish = {
+                id: `wish_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                kidName: '小豌豆',
+                bookId: t.bookId || '',
+                bookTitle: t.bookTitle || '',
+                pageNumber: t.bookId ? (t.pageNumber || 1) : 1,
+                mode: t.bookId ? (t.mode || 'storybook') : 'shelf',
+                text,
+                target: targetPayload,
+                instantReplyKey: '',
+                instantReplyText: '',
+                status: 'pending',
+                syncedCloud: false,
+                createdAt: Date.now(),
+                createdStr: nowTimeStr()
+            };
+
+            this.isSending = true;
+            this._dispatchedWishKey = '';
+            this._thinkingWishId = wish.id;
+            this.state.wishes.push(wish);
+            this.dom.textInput.value = '';
+            this._saveLocalState();
+            this._syncActionButtons();
+            this._renderDispatchBar();
+            this.renderTimeline({ forceScroll: true });
+            this.dom.statusHint.textContent = '🔮 魔法画师正在认真听你的点子…';
+
             let replyText = '';
             let replyKey = 'local_fallback';
             let audioBase64 = '';
@@ -1659,17 +1681,20 @@ export class StoryMailboxController {
             }
         } catch (_) {
             this._thinkingWishId = null;
-            wish.instantReplyKey = 'local_fallback';
-            wish.instantReplyText = `收到小豌豆的奇思妙想啦！我已经把你的好点子记在魔法画本里了！`;
-            this._saveLocalState();
-            this.renderTimeline({ forceScroll: true });
+            if (wish) {
+                wish.instantReplyKey = 'local_fallback';
+                wish.instantReplyText = `收到小豌豆的奇思妙想啦！我已经把你的好点子记在魔法画本里了！`;
+                this._saveLocalState();
+                this.renderTimeline({ forceScroll: true });
+            }
         } finally {
             this.isSending = false;
+            this._sendLock = false;
             this._syncActionButtons();
         }
     }
 
-    async syncFromCloud() {
+    async syncFromCloud({ suppressNewReplyCallback = false } = {}) {
         if (!this._shouldUseCloudApi()) return null;
         try {
             const unsynced = (this.state.wishes || []).filter((w) => !w.syncedCloud);
@@ -1723,7 +1748,7 @@ export class StoryMailboxController {
                 if (nextFp !== this._lastRenderedFingerprint) {
                     this.renderTimeline({ forceScroll: false });
                 }
-            } else if (newlyArrived.length > 0) {
+            } else if (!suppressNewReplyCallback && newlyArrived.length > 0) {
                 this.onNewReply(newlyArrived[newlyArrived.length - 1]);
             }
 

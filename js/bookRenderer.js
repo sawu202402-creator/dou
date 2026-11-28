@@ -23,9 +23,11 @@ export function renderBookshelf(container, books, {
     latestBookId = '',
     updatedJustNow = false,
     readingProgress = {},
+    voiceProfile = null,
     onOpenBook,
     onHoverBook,
-    onOpenMailbox
+    onOpenMailbox,
+    onOpenVoiceStudio
 } = {}) {
     if (!container) return;
 
@@ -72,13 +74,22 @@ export function renderBookshelf(container, books, {
         </button>
     `;
 
+    const vp = voiceProfile || {};
+    const voicePillLabel = vp.cloneReady
+        ? '🎙️ 专属声音生效中'
+        : (vp.hasSample ? '🎙️ 原声已存(待Key)' : '🎙️ 录小豌豆真实声音');
+    const voicePillReadyCls = vp.cloneReady ? ' is-ready' : '';
+
     container.innerHTML = `
         <section class="shelf-hero">
             <div class="shelf-hero-text">
                 <h1>🐰 小豌豆的魔法书架</h1>
                 <p>点开一本书，可以切换「精装绘本」或「多格漫画」两种阅读魔法哦！</p>
             </div>
-            <div class="shelf-count-badge">📚 共 ${books.length} 本原创作品</div>
+            <div class="shelf-hero-badges">
+                <button type="button" id="btn-shelf-voice-studio" class="btn-shelf-voice${voicePillReadyCls}">${voicePillLabel}</button>
+                <div class="shelf-count-badge">📚 共 ${books.length} 本原创作品</div>
+            </div>
         </section>
         <div class="bookshelf-grid">
             ${cardsHtml}
@@ -112,6 +123,11 @@ export function renderBookshelf(container, books, {
     const shelfMailboxBtn = container.querySelector('#btn-shelf-open-mailbox');
     if (shelfMailboxBtn && typeof onOpenMailbox === 'function') {
         shelfMailboxBtn.addEventListener('click', () => onOpenMailbox());
+    }
+
+    const shelfVoiceBtn = container.querySelector('#btn-shelf-voice-studio');
+    if (shelfVoiceBtn && typeof onOpenVoiceStudio === 'function') {
+        shelfVoiceBtn.addEventListener('click', () => onOpenVoiceStudio());
     }
 }
 
