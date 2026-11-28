@@ -47,6 +47,22 @@
       "bubbleBg": "#FFF4E8",
       "bubbleBorder": "#F08C42",
       "badgeBg": "#FFE2C4"
+    },
+    "brook": {
+      "name": "小溪流",
+      "emoji": "💧",
+      "voiceRole": "star_boy",
+      "bubbleBg": "#E6FAFF",
+      "bubbleBorder": "#38B6D8",
+      "badgeBg": "#C7F2FF"
+    },
+    "firefly": {
+      "name": "小萤火虫",
+      "emoji": "✨",
+      "voiceRole": "fairy",
+      "bubbleBg": "#F3FFE8",
+      "bubbleBorder": "#7AC943",
+      "badgeBg": "#DCFBBE"
     }
   },
   "pages": [
@@ -340,6 +356,231 @@
               "characterId": "ink_sprite",
               "text": "点点页面上的「改这一页」，随时就能请画师续写新文章哦！",
               "pinyin": "diǎn dian yè miàn shàng de gǎi zhè yì yè suí shí jiù néng qǐng huà shī xù xiě xīn wén zhāng o",
+              "side": "right"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 5,
+      "title": "《小溪流的歌》· 严文井",
+      "titlePinyin": "xiǎo xī liú de gē yán wén jǐng",
+      "illustration": "books/chinese-reading-notebook/images/p05-1.webp",
+      "storyParagraphs": [
+        {
+          "text": "【篇名：《小溪流的歌》｜作者：严文井】一条快活的小溪流哼哼唱唱、不分日夜地向前奔流。太阳出来了，太阳向着他微笑；月亮出来了，月亮也向着他微笑。",
+          "pinyin": "piān míng xiǎo xī liú de gē zuò zhě yán wén jǐng yì tiáo kuài huó de xiǎo xī liú hēng hēng chàng chàng bù fēn rì yè de xiàng qián bēn liú tài yáng chū lái le tài yáng xiàng zhe tā wēi xiào yuè liang chū lái le yuè liang yě xiàng zhe tā wēi xiào"
+        },
+        {
+          "text": "他一会儿拍拍岸边五颜六色的石卵，一会儿摸摸沙地上才伸出脑袋来的小草，一会儿让漂浮的小树叶打个转儿，一会儿挠挠追赶他的小蝌蚪的痒痒。",
+          "pinyin": "tā yí huì er pāi pāi àn biān wǔ yán liù sè de shí luǎn yí huì er mō mō shā dì shàng cái shēn chū nǎo dai lái de xiǎo cǎo yí huì er ràng piāo fú de xiǎo shù yè dǎ gè zhuàn er yí huì er náo náo zhuī gǎn tā de xiǎo kē dǒu de yǎng yang"
+        },
+        {
+          "text": "有巨大石块拦路，他就轻轻跳跃冲下去，不知疲倦地往前流。好词积累：哼哼唱唱、五颜六色、清脆、不知疲倦、兴致勃勃！",
+          "pinyin": "yǒu jù dà shí kuài lán lù tā jiù qīng qīng tiào yuè chōng xià qù bù zhī pí juàn de wǎng qián liú hǎo cí jī lěi hēng hēng chàng chàng wǔ yán liù sè qīng cuì bù zhī pí juàn xìng zhì bó bó"
+        }
+      ],
+      "comicLayout": "hero-top",
+      "panels": [
+        {
+          "image": "books/chinese-reading-notebook/images/p05-1.webp",
+          "caption": "第五篇童话是严文井爷爷写的《小溪流的歌》，清亮的小溪哼唱着向前奔流。",
+          "captionPinyin": "dì wǔ piān tóng huà shì yán wén jǐng yé ye xiě de xiǎo xī liú de gē qīng liàng de xiǎo xī hēng chàng zhe xiàng qián bēn liú",
+          "stickers": [
+            { "text": "哗啦啦～🎵", "style": "pop-mint", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "brook",
+              "text": "太阳向着我微笑，月亮也向着我微笑，你好你好！",
+              "pinyin": "tài yáng xiàng zhe wǒ wēi xiào yuè liang yě xiàng zhe wǒ wēi xiào nǐ hǎo nǐ hǎo",
+              "side": "left"
+            },
+            {
+              "characterId": "pea",
+              "text": "好可爱的童话呀，连小溪流都会兴致勃勃地唱歌！",
+              "pinyin": "hǎo kě ài de tóng huà ya lián xiǎo xī liú dōu huì xìng zhì bó bó de chàng gē",
+              "side": "right"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p05-2.webp",
+          "caption": "他拍拍五颜六色的石卵，摸摸嫩草，还挠挠小蝌蚪的痒痒！",
+          "captionPinyin": "tā pāi pāi wǔ yán liù sè de shí luǎn mō mō nèn cǎo hái náo náo xiǎo kē dǒu de yǎng yang",
+          "stickers": [
+            { "text": "打个转儿！🍃", "style": "pop-gold", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "mochi",
+              "text": "连用四个一会儿，写得好像动画片一样热闹！",
+              "pinyin": "lián yòng sì gè yí huì er xiě de hǎo xiàng dòng huà piàn yí yàng rè nao",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p05-3.webp",
+          "caption": "遇到巨大石块拦路，小溪流轻轻跳跃冲过去，不知疲倦地往前跑。",
+          "captionPinyin": "yù dào jù dà shí kuài lán lù xiǎo xī liú qīng qīng tiào yuè chōng guò qù bù zhī pí juàn de wǎng qián pǎo",
+          "stickers": [
+            { "text": "咕咚跳！💧", "style": "pop-purple", "pos": "top-right", "rotate": 7 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "ink_sprite",
+              "text": "这个排比好句写游记和日记都能用，快收进积累本！",
+              "pinyin": "zhè gè pái bǐ hǎo jù xiě yóu jì hé rì jì dōu néng yòng kuài shōu jìn jī lěi běn",
+              "side": "left"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 6,
+      "title": "《神笔马良》· 洪汛涛",
+      "titlePinyin": "shén bǐ mǎ liáng hóng xùn tāo",
+      "illustration": "books/chinese-reading-notebook/images/p06-2.webp",
+      "storyParagraphs": [
+        {
+          "text": "【篇名：《神笔马良》｜作者：洪汛涛】马良喜爱画画，上山打柴捡树枝在沙地描飞鸟，河边割草用草根蘸河水在岸石描游鱼。",
+          "pinyin": "piān míng shén bǐ mǎ liáng zuò zhě hóng xùn tāo mǎ liáng xǐ ài huà huà shàng shān dǎ chái jiǎn shù zhī zài shā dì miáo fēi niǎo hé biān gē cǎo yòng cǎo gēn zhàn hé shuǐ zài àn shí miáo yóu yú"
+        },
+        {
+          "text": "他孜孜不倦地画，石壁上画满层层叠叠的画，进步快极了，真是画出的鸟就差不会叫了，画出的鱼就差不会游了。",
+          "pinyin": "tā zī zī bú juàn de huà shí bì shàng huà mǎn céng céng dié dié de huà jìn bù kuài jí le zhēn shì huà chū de niǎo jiù chà bú huì jiào le huà chū de yú jiù chà bú huì yóu le"
+        },
+        {
+          "text": "后来白胡子老爷爷送他一支金光灿灿的神笔去帮助大家。好词积累：孜孜不倦、持之以恒、金光灿灿、活灵活现！",
+          "pinyin": "hòu lái bái hú zi lǎo yé ye sòng tā yì zhī jīn guāng càn càn de shén bǐ qù bāng zhù dà jiā hǎo cí jī lěi zī zī bú juàn chí zhī yǐ héng jīn guāng càn càn huó líng huó xiàn"
+        }
+      ],
+      "comicLayout": "strip-3",
+      "panels": [
+        {
+          "image": "books/chinese-reading-notebook/images/p06-1.webp",
+          "caption": "第六篇童话是洪汛涛爷爷写的《神笔马良》，马良坚持天天练习画画。",
+          "captionPinyin": "dì liù piān tóng huà shì hóng xùn tāo yé ye xiě de shén bǐ mǎ liáng mǎ liáng jiān chí tiān tiān liàn xí huà huà",
+          "stickers": [
+            { "text": "沙沙练！🌿", "style": "pop-mint", "pos": "top-right", "rotate": -5 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "laoye",
+              "text": "马良用树枝和草根孜孜不倦地学画，真是持之以恒的好榜样！",
+              "pinyin": "mǎ liáng yòng shù zhī hé cǎo gēn zī zī bú juàn de xué huà zhēn shì chí zhī yǐ héng de hǎo bǎng yàng",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p06-2.webp",
+          "caption": "画出的鸟就差不会叫了，画出的鱼就差不会游了，真是活灵活现！",
+          "captionPinyin": "huà chū de niǎo jiù chà bú huì jiào le huà chū de yú jiù chà bú huì yóu le zhēn shì huó líng huó xiàn",
+          "stickers": [
+            { "text": "活灵活现！🐦", "style": "pop-pink", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "这句夸张太棒了，把画得像真的一样写得超级生动！",
+              "pinyin": "zhè jù kuā zhāng tài bàng le bǎ huà de xiàng zhēn de yí yàng xiě de chāo jí shēng dòng",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p06-3.webp",
+          "caption": "神仙爷爷送给马良一支金光灿灿的神笔，让他去帮助困难的人。",
+          "captionPinyin": "shén xiān yé ye sòng gěi mǎ liáng yì zhī jīn guāng càn càn de shén bǐ ràng tā qù bāng zhù kùn nan de rén",
+          "stickers": [
+            { "text": "金光灿灿！✨", "style": "pop-gold", "pos": "top-right", "rotate": -7 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "mochi",
+              "text": "我也想有一支金光灿灿的魔法画笔，画出好多甜甜的糕点！",
+              "pinyin": "wǒ yě xiǎng yǒu yì zhī jīn guāng càn càn de mó fǎ huà bǐ huà chū hǎo duō tián tián de gāo diǎn",
+              "side": "left"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 7,
+      "title": "《盲孩子和他的影子》· 金波",
+      "titlePinyin": "máng hái zi hé tā de yǐng zi jīn bō",
+      "illustration": "books/chinese-reading-notebook/images/p07-3.webp",
+      "storyParagraphs": [
+        {
+          "text": "【篇名：《盲孩子和他的影子》｜作者：金波】一个淡淡的光点在盲孩子手心移动，痒酥酥的。无数萤火虫组合成明亮的灯，闪着幽蓝和翠绿的光。",
+          "pinyin": "piān míng máng hái zi hé tā de yǐng zi zuò zhě jīn bō yí gè dàn dàn de guāng diǎn zài máng hái zi shǒu xīn yí dòng yǎng sū sū de wú shù yíng huǒ chóng zǔ hé chéng míng liàng de dēng shǎn zhe yōu lán hé cuì lǜ de guāng"
+        },
+        {
+          "text": "风停了，雨停了，天晴了。月亮和太阳同时挂在天上，天边出现弯弯的彩虹，还有五颜六色的花朵和草叶上明亮的露珠！",
+          "pinyin": "fēng tíng le yǔ tíng le tiān qíng le yuè liang hé tài yáng tóng shí guà zài tiān shàng tiān biān chū xiàn wān wān de cǎi hóng hái yǒu wǔ yán liù sè de huā duǒ hé cǎo yè shàng míng liàng de lù zhū"
+        },
+        {
+          "text": "好词积累：痒酥酥、幽蓝、翠绿、弯弯的彩虹、明亮的露珠！7 篇美文和童话已经收好，随时点改这一页就能继续往后添新故事哦！",
+          "pinyin": "hǎo cí jī lěi yǎng sū sū yōu lán cuì lǜ wān wān de cǎi hóng míng liàng de lù zhū piān měi wén hé tóng huà yǐ jīng shōu hǎo suí shí diǎn gǎi zhè yí yè jiù néng jì xù wǎng hòu tiān xīn gù shi o"
+        }
+      ],
+      "comicLayout": "hero-bottom",
+      "panels": [
+        {
+          "image": "books/chinese-reading-notebook/images/p07-1.webp",
+          "caption": "第七篇童话是金波爷爷写的《盲孩子和他的影子》，小萤火虫落在温暖手心。",
+          "captionPinyin": "dì qī piān tóng huà shì jīn bō yé ye xiě de máng hái zi hé tā de yǐng zi xiǎo yíng huǒ chóng luò zài wēn nuǎn shǒu xīn",
+          "stickers": [
+            { "text": "痒酥酥～✨", "style": "pop-mint", "pos": "top-right", "rotate": 5 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "firefly",
+              "text": "我是小小的光点，停在你的手心里痒酥酥的，带来幽蓝翠绿的微光！",
+              "pinyin": "wǒ shì xiǎo xiǎo de guāng diǎn tíng zài nǐ de shǒu xīn lǐ yǎng sū sū de dài lái yōu lán cuì lǜ de wēi guāng",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p07-2.webp",
+          "caption": "夏夜微风里，成千上万只萤火虫聚在一起，点亮一盏明亮的灯！",
+          "captionPinyin": "xià yè wēi fēng lǐ chéng qiān shàng wàn zhī yíng huǒ chóng jù zài yì qǐ diǎn liàng yì zhǎn míng liàng de dēng",
+          "stickers": [
+            { "text": "幽蓝翠绿！🌟", "style": "pop-purple", "pos": "top-right", "rotate": -6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "cat",
+              "text": "幽蓝和翠绿交织在一起，就像天空掉下来的萤火虫宝灯，太梦幻了！",
+              "pinyin": "yōu lán hé cuì lǜ jiāo zhī zài yì qǐ jiù xiàng tiān kōng diào xià lái de yíng huǒ chóng bǎo dēng tài mèng huàn le",
+              "side": "left"
+            }
+          ]
+        },
+        {
+          "image": "books/chinese-reading-notebook/images/p07-3.webp",
+          "caption": "风停雨散，太阳、月亮和弯弯的彩虹一齐出现，我们都是光明的孩子！",
+          "captionPinyin": "fēng tíng yǔ sàn tài yáng yuè liang hé wān wān de cǎi hóng yì qí chū xiàn wǒ men dōu shì guāng míng de hái zi",
+          "stickers": [
+            { "text": "童话大宝库！🌈", "style": "pop-pink", "pos": "top-right", "rotate": 6 }
+          ],
+          "bubbles": [
+            {
+              "characterId": "pea",
+              "text": "童话里的句子好美，我记住了痒酥酥、幽蓝和明亮的露珠！",
+              "pinyin": "tóng huà lǐ de jù zi hǎo měi wǒ jì zhù le yǎng sū sū yōu lán hé míng liàng de lù zhū",
+              "side": "left"
+            },
+            {
+              "characterId": "ink_sprite",
+              "text": "你的积累本现在越写越厚啦，下次想添什么新故事尽管说！",
+              "pinyin": "nǐ de jī lěi běn xiàn zài yuè xiě yuè hòu la xià cì xiǎng tiān shén me xīn gù shi jǐn guǎn shuō",
               "side": "right"
             }
           ]

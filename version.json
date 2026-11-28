@@ -1,10 +1,10 @@
 {
-  "version": "2026.11.28.002",
-  "updatedAt": "2026-11-28T12:38:30+05:30",
+  "version": "2026.11.28.003",
+  "updatedAt": "2026-11-28T12:46:40+05:30",
   "latestBookId": "chinese-reading-notebook",
-  "latestPage": 1,
-  "changeType": "updated_book",
-  "summary": "上线「我的声音」AI 声线克隆录音台（内置 3 平台适配器）并修复回复声音重复播放",
+  "latestPage": 5,
+  "changeType": "new_page",
+  "summary": "为《小豌豆的中国好文章积累本》新增 3 篇中国名家童话（第 5~7 页）",
   "silent": false,
-  "announcement": "小豌豆！你的专属声音魔法室上线啦！快点上面「我的声音」录一段15秒朗读，以后每本书里的小豌豆都会变成你的声音哦！"
+  "announcement": "小豌豆！你的中国积累本新添了《小溪流的歌》《神笔马良》和《盲孩子和他的影子》三篇童话，快翻到第5页看好词好句吧！"
 }

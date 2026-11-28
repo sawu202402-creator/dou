@@ -4,13 +4,13 @@
       "id": "chinese-reading-notebook",
       "title": "小豌豆的中国好文章积累本",
       "emoji": "📖",
-      "subtitle": "收录中国名家的优美文章、文章名称与作者，还能一直往后添新篇哦！",
+      "subtitle": "收录中国名家的优美散文与童话故事，标明篇名作者与好词好句，还能一直往后添新篇哦！",
       "author": "小豌豆 & 魔法画师",
       "cover": "books/chinese-reading-notebook/images/cover.webp",
-      "pageCount": 4,
+      "pageCount": 7,
       "defaultMode": "storybook",
-      "tags": ["中国名篇", "积累本", "美文"],
-      "updatedAt": "2026-11-28T12:12:00+05:30"
+      "tags": ["中国名篇", "童话好句", "积累本"],
+      "updatedAt": "2026-11-28T12:43:00+05:30"
     },
     {
       "id": "yanyan-sea-wave-adventure",
