@@ -93,6 +93,8 @@ export class StoryMailboxController {
     constructor({
         audioEngine,
         getContext,
+        getBooks,
+        loadBook,
         onJumpToBook,
         onBeforeOpen,
         onNewReply,
@@ -100,6 +102,8 @@ export class StoryMailboxController {
     } = {}) {
         this.audioEngine = audioEngine;
         this.getContext = typeof getContext === 'function' ? getContext : () => ({ view: 'shelf' });
+        this.getBooks = typeof getBooks === 'function' ? getBooks : () => [];
+        this.loadBook = typeof loadBook === 'function' ? loadBook : async () => null;
         this.onJumpToBook = typeof onJumpToBook === 'function' ? onJumpToBook : () => {};
         this.onBeforeOpen = typeof onBeforeOpen === 'function' ? onBeforeOpen : () => {};
         this.onNewReply = typeof onNewReply === 'function' ? onNewReply : () => {};
@@ -123,6 +127,25 @@ export class StoryMailboxController {
         };
         this._patrolBusy = false;
         this._lastRenderedFingerprint = '';
+        this.editTarget = {
+            scope: 'new_book',
+            bookId: '',
+            bookTitle: '',
+            pageNumber: 1,
+            panelNumber: 0,
+            mode: 'shelf',
+            actionType: 'general',
+            characterId: '',
+            characterName: '',
+            characterEmoji: '',
+            previewImage: '',
+            pageTitle: '',
+            snippet: ''
+        };
+        this._activeBookData = null;
+        this._bookDataSeq = 0;
+        this._dispatchBusy = false;
+        this._dispatchedWishKey = '';
 
         this.isOpen = false;
         this.isRecording = false;
@@ -231,24 +254,26 @@ export class StoryMailboxController {
     }
 
     _getInspirationChips() {
-        const ctx = this.getContext() || {};
-        const title = ctx.bookTitle ? `《${ctx.bookTitle}》` : '';
-        const pageNum = ctx.pageNumber || 1;
+        const t = this.editTarget || {};
+        if (t.bookId) {
+            const title = t.bookTitle || '这本书';
+            const pageNum = t.pageNumber || 1;
+            const panelText = t.panelNumber > 0 ? `第${t.panelNumber}格` : '';
+            const loc = `《${title}》第${pageNum}页${panelText}`;
+            const who = t.characterName ? `里的${t.characterName}` : '';
+            return [
+                { icon: '🎨', label: '改这幅画', actionType: 'art', prefix: `我想把${loc}${who}的画面改成：` },
+                { icon: '💬', label: '改台词', actionType: 'dialogue', prefix: `我想把${loc}${who}说的话改成：` },
+                { icon: '🔊', label: '改声音', actionType: 'voice', prefix: `我觉得${loc}${who}的声音可以改成：` },
+                { icon: '➕', label: '续写下一页', actionType: 'next_page', prefix: `我想给《${title}》续写下一页：` },
+                { icon: '🐾', label: '加小伙伴', actionType: 'art', prefix: `我想在${loc}新加一个小伙伴：` }
+            ];
+        }
         return [
-            { icon: '✨', label: '编一本新绘本', prefix: '我想新编一本故事书，主角是：' },
-            {
-                icon: '📖',
-                label: '续写下一页',
-                prefix: title ? `我想给${title}续写下一页：` : '我想续写新的一页故事：'
-            },
-            {
-                icon: '💬',
-                label: '改这页台词',
-                prefix: title ? `我想改一下${title}第${pageNum}页的画面或台词：` : '我想修改一下故事里的台词：'
-            },
-            { icon: '🐾', label: '加新小伙伴', prefix: '我想在故事里新加一个小伙伴：' },
-            { icon: '🪄', label: '加神奇魔法', prefix: '如果故事里出现这样的魔法一定超酷：' },
-            { icon: '👋', label: '跟画师聊天', prefix: '嗨魔法画师！跟你说件好玩的事：' }
+            { icon: '✨', label: '编一本新绘本', actionType: 'general', prefix: '我想新编一本故事书，主角是：' },
+            { icon: '🐾', label: '加新小伙伴', actionType: 'art', prefix: '我想在故事里新加一个小伙伴：' },
+            { icon: '🪄', label: '加神奇魔法', actionType: 'art', prefix: '如果故事里出现这样的魔法一定超酷：' },
+            { icon: '👋', label: '跟画师聊天', actionType: 'general', prefix: '嗨魔法画师！跟你说件好玩的事：' }
         ];
     }
 
@@ -277,7 +302,7 @@ export class StoryMailboxController {
                         <span id="smPatrolDot" class="sm-patrol-dot" aria-hidden="true"></span>
                         <div class="sm-patrol-texts">
                             <div id="smPatrolTitle" class="sm-patrol-title">🌙 画师自动巡检：已关闭</div>
-                            <div id="smPatrolSub" class="sm-patrol-sub">平时不巡检省资源；准备画新书时点右边打开</div>
+                            <div id="smPatrolSub" class="sm-patrol-sub">平时零消耗休息中；小豌豆一发点子会自动唤醒画师</div>
                         </div>
                     </div>
                     <button type="button" id="smPatrolSwitch" class="sm-switch" role="switch" aria-checked="false" aria-label="开启或关闭画师自动巡检">
@@ -285,10 +310,16 @@ export class StoryMailboxController {
                     </button>
                 </div>
 
+                <div id="smTargetPanel" class="sm-target-panel">
+                    <div id="smBookPicker" class="sm-book-picker" role="tablist" aria-label="选择要聊或修改的故事书"></div>
+                    <div id="smTargetCard" class="sm-target-card" hidden></div>
+                </div>
+
                 <div id="smStream" class="sm-stream" aria-live="polite"></div>
 
                 <footer class="sm-composer">
                     <div id="smChipsRow" class="sm-chips-row"></div>
+                    <div id="smCharChipsRow" class="sm-char-chips-row" hidden></div>
                     <div id="smRecBanner" class="sm-rec-banner" hidden>
                         <span class="sm-rec-dot" aria-hidden="true"></span>
                         <span id="smRecBannerText">正在听小豌豆说话…</span>
@@ -312,6 +343,10 @@ export class StoryMailboxController {
                             <span id="smSendText">发送给画师</span>
                         </button>
                     </div>
+                    <div id="smDispatchBar" class="sm-dispatch-bar" hidden>
+                        <span id="smDispatchText" class="sm-dispatch-text">💬 还可以继续补充哦！聊完点右边立刻开工（或等 40 秒自动开画）</span>
+                        <button type="button" id="smDispatchBtn" class="sm-dispatch-btn">🎨 说好啦，立刻开工</button>
+                    </div>
                     <div id="smWakePrompt" class="sm-wake-prompt" hidden>
                         <span>🌙 点子已存好，画师正在休息中～</span>
                         <button type="button" id="smWakeNowBtn" class="sm-wake-btn">✨ 召唤画师立刻来画</button>
@@ -331,8 +366,12 @@ export class StoryMailboxController {
             patrolTitle: overlay.querySelector('#smPatrolTitle'),
             patrolSub: overlay.querySelector('#smPatrolSub'),
             patrolSwitch: overlay.querySelector('#smPatrolSwitch'),
+            targetPanel: overlay.querySelector('#smTargetPanel'),
+            bookPicker: overlay.querySelector('#smBookPicker'),
+            targetCard: overlay.querySelector('#smTargetCard'),
             stream: overlay.querySelector('#smStream'),
             chipsRow: overlay.querySelector('#smChipsRow'),
+            charChipsRow: overlay.querySelector('#smCharChipsRow'),
             recBanner: overlay.querySelector('#smRecBanner'),
             recBannerText: overlay.querySelector('#smRecBannerText'),
             textInput: overlay.querySelector('#smTextInput'),
@@ -341,6 +380,9 @@ export class StoryMailboxController {
             micText: overlay.querySelector('#smMicText'),
             sendBtn: overlay.querySelector('#smSendBtn'),
             sendText: overlay.querySelector('#smSendText'),
+            dispatchBar: overlay.querySelector('#smDispatchBar'),
+            dispatchText: overlay.querySelector('#smDispatchText'),
+            dispatchBtn: overlay.querySelector('#smDispatchBtn'),
             wakePrompt: overlay.querySelector('#smWakePrompt'),
             wakeNowBtn: overlay.querySelector('#smWakeNowBtn'),
             statusHint: overlay.querySelector('#smStatusHint')
@@ -359,6 +401,79 @@ export class StoryMailboxController {
         this.dom.wakeNowBtn?.addEventListener('click', () => {
             this.audioEngine?.unlockInGesture?.();
             this.setPatrolEnabled(true);
+        });
+
+        this.dom.dispatchBtn?.addEventListener('click', () => {
+            this.audioEngine?.unlockInGesture?.();
+            this.dispatchNow();
+        });
+
+        this.dom.bookPicker?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-pick-book]');
+            if (!btn) return;
+            const pickId = btn.getAttribute('data-pick-book') || '';
+            if (!pickId) {
+                this._setEditTarget({ scope: 'new_book', bookId: '' });
+                return;
+            }
+            const ctx = this.getContext() || {};
+            if (ctx.view === 'reader' && ctx.bookId === pickId) {
+                this._setEditTarget({
+                    scope: 'page',
+                    bookId: pickId,
+                    bookTitle: ctx.bookTitle,
+                    pageNumber: ctx.pageNumber || 1,
+                    mode: ctx.mode || 'storybook'
+                });
+            } else {
+                this._setEditTarget({
+                    scope: 'page',
+                    bookId: pickId,
+                    pageNumber: 1
+                });
+            }
+        });
+
+        this.dom.targetCard?.addEventListener('click', (e) => {
+            const pageBtn = e.target.closest('[data-pick-page]');
+            if (pageBtn && this.editTarget.bookId) {
+                const nextPage = Math.max(1, Number(pageBtn.getAttribute('data-pick-page')) || 1);
+                this.editTarget.pageNumber = nextPage;
+                this.editTarget.panelNumber = 0;
+                this.editTarget.scope = 'page';
+                this.editTarget.characterId = '';
+                this.editTarget.characterName = '';
+                this.editTarget.characterEmoji = '';
+                this._syncTargetBookData();
+                return;
+            }
+            const panelBtn = e.target.closest('[data-pick-panel]');
+            if (panelBtn && this.editTarget.bookId) {
+                const nextPanel = Math.max(0, Number(panelBtn.getAttribute('data-pick-panel')) || 0);
+                this.editTarget.panelNumber = nextPanel;
+                this.editTarget.scope = nextPanel > 0 ? 'panel' : 'page';
+                if (nextPanel > 0) this.editTarget.mode = 'comic';
+                this._syncTargetBookData();
+            }
+        });
+
+        this.dom.charChipsRow?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-char-id]');
+            if (!btn) return;
+            const cid = btn.getAttribute('data-char-id') || '';
+            const chars = this._activeBookData?.characters || {};
+            const ch = chars[cid];
+            if (!ch) return;
+            if (this.editTarget.characterId === cid) {
+                this.editTarget.characterId = '';
+                this.editTarget.characterName = '';
+                this.editTarget.characterEmoji = '';
+            } else {
+                this.editTarget.characterId = cid;
+                this.editTarget.characterName = ch.name || cid;
+                this.editTarget.characterEmoji = ch.emoji || '';
+            }
+            this._refreshTargetUi();
         });
 
         this.dom.micBtn.addEventListener('click', () => {
@@ -520,6 +635,7 @@ export class StoryMailboxController {
                 const idx = Number(btn.getAttribute('data-chip-idx'));
                 const chip = chips[idx];
                 if (!chip) return;
+                this.editTarget.actionType = chip.actionType || 'general';
                 this.dom.textInput.value = chip.prefix;
                 this.dom.textInput.focus();
                 this._syncActionButtons();
@@ -527,14 +643,351 @@ export class StoryMailboxController {
         });
     }
 
+    _setEditTarget(preset = null) {
+        const books = this.getBooks() || [];
+        if (preset && preset.bookId) {
+            const manifestEntry = books.find((b) => b.id === preset.bookId);
+            const panelNumber = Math.max(0, Number(preset.panelNumber) || 0);
+            this.editTarget = {
+                scope: preset.scope || (panelNumber > 0 ? 'panel' : 'page'),
+                bookId: preset.bookId,
+                bookTitle: preset.bookTitle || manifestEntry?.title || '',
+                pageNumber: Math.max(1, Number(preset.pageNumber) || 1),
+                panelNumber,
+                mode: preset.mode || (panelNumber > 0 ? 'comic' : (manifestEntry?.defaultMode || 'storybook')),
+                actionType: preset.actionType || 'general',
+                characterId: preset.characterId || '',
+                characterName: preset.characterName || '',
+                characterEmoji: preset.characterEmoji || '',
+                previewImage: preset.previewImage || manifestEntry?.cover || '',
+                pageTitle: preset.pageTitle || '',
+                snippet: preset.snippet || ''
+            };
+        } else {
+            this.editTarget = {
+                scope: 'new_book',
+                bookId: '',
+                bookTitle: '',
+                pageNumber: 1,
+                panelNumber: 0,
+                mode: 'shelf',
+                actionType: 'general',
+                characterId: '',
+                characterName: '',
+                characterEmoji: '',
+                previewImage: '',
+                pageTitle: '',
+                snippet: ''
+            };
+        }
+        this._syncTargetBookData();
+    }
+
+    async _syncTargetBookData() {
+        const targetBookId = this.editTarget.bookId;
+        if (!targetBookId) {
+            this._bookDataSeq++;
+            this._activeBookData = null;
+            this._refreshTargetUi();
+            return;
+        }
+
+        if (this._activeBookData?.id !== targetBookId) {
+            this._activeBookData = null;
+        }
+        this._refreshTargetUi();
+
+        const seq = ++this._bookDataSeq;
+        const loaded = await this.loadBook(targetBookId).catch(() => null);
+        if (seq !== this._bookDataSeq || this.editTarget.bookId !== targetBookId) return;
+        this._activeBookData = loaded;
+
+        if (loaded && Array.isArray(loaded.pages) && loaded.pages.length > 0) {
+            const maxPages = loaded.pages.length;
+            const pageNum = Math.max(1, Math.min(maxPages, this.editTarget.pageNumber || 1));
+            const pageObj = loaded.pages[pageNum - 1];
+            const panels = Array.isArray(pageObj?.panels) ? pageObj.panels : [];
+            const panelNum = this.editTarget.panelNumber > 0 && panels.length > 0
+                ? Math.min(panels.length, this.editTarget.panelNumber)
+                : 0;
+            const panelObj = panelNum > 0 ? panels[panelNum - 1] : null;
+
+            this.editTarget.pageNumber = pageNum;
+            this.editTarget.panelNumber = panelNum;
+            if (panelNum > 0) this.editTarget.scope = 'panel';
+            this.editTarget.bookTitle = loaded.title || this.editTarget.bookTitle;
+            this.editTarget.pageTitle = pageObj?.title || '';
+            this.editTarget.previewImage = panelObj?.image || pageObj?.illustration || loaded.cover || this.editTarget.previewImage;
+
+            let snippet = '';
+            if (this.editTarget.characterId) {
+                const bubblePool = panelObj?.bubbles || panels.flatMap((p) => p.bubbles || []);
+                const charBubble = bubblePool.find((b) => b.characterId === this.editTarget.characterId);
+                if (charBubble?.text) snippet = charBubble.text;
+            }
+            if (!snippet && panelObj) {
+                snippet = panelObj.caption || panelObj.bubbles?.[0]?.text || '';
+            }
+            if (!snippet) {
+                snippet = pageObj?.storyParagraphs?.[0]?.text || '';
+            }
+            this.editTarget.snippet = String(snippet).slice(0, 80);
+        }
+
+        this._refreshTargetUi();
+    }
+
+    _refreshTargetUi() {
+        this._renderBookPicker();
+        this._renderTargetCard();
+        this._renderCharChips();
+        this._renderChips();
+        this._updateContextPill();
+    }
+
+    _renderBookPicker() {
+        if (!this.dom.bookPicker) return;
+        const books = this.getBooks() || [];
+        const activeId = this.editTarget.bookId || '';
+        const newBookActive = !activeId;
+        const itemsHtml = [
+            `<button type="button" class="sm-book-pick-btn ${newBookActive ? 'is-active' : ''}" data-pick-book="" role="tab" aria-selected="${newBookActive}">✨ 编新书</button>`,
+            ...books.map((b) => {
+                const active = b.id === activeId;
+                const thumbHtml = b.cover
+                    ? `<img src="${escapeHtml(b.cover)}" alt="" class="sm-book-thumb" loading="lazy" decoding="async">`
+                    : `<span>${escapeHtml(b.emoji || '📖')}</span>`;
+                return `
+                    <button type="button" class="sm-book-pick-btn ${active ? 'is-active' : ''}" data-pick-book="${escapeHtml(b.id)}" role="tab" aria-selected="${active}">
+                        ${thumbHtml}
+                        <span>${escapeHtml(b.title)}</span>
+                    </button>
+                `;
+            })
+        ];
+        this.dom.bookPicker.innerHTML = itemsHtml.join('');
+    }
+
+    _renderTargetCard() {
+        const card = this.dom.targetCard;
+        if (!card) return;
+        const t = this.editTarget;
+        if (!t.bookId) {
+            card.hidden = true;
+            card.innerHTML = '';
+            return;
+        }
+        card.hidden = false;
+
+        const manifestEntry = (this.getBooks() || []).find((b) => b.id === t.bookId);
+        const totalPages = this._activeBookData?.pages?.length || Number(manifestEntry?.pageCount) || 1;
+        const pageObj = this._activeBookData?.pages?.[t.pageNumber - 1];
+        const panels = Array.isArray(pageObj?.panels) ? pageObj.panels : [];
+
+        const pagePills = [];
+        for (let p = 1; p <= totalPages; p++) {
+            const act = p === t.pageNumber ? 'is-active' : '';
+            pagePills.push(`<button type="button" class="sm-mini-pill ${act}" data-pick-page="${p}">第${p}页</button>`);
+        }
+
+        const panelPills = [];
+        if (panels.length > 0) {
+            panelPills.push('<span class="sm-mini-sep">|</span>');
+            panelPills.push(`<button type="button" class="sm-mini-pill ${t.panelNumber === 0 ? 'is-active' : ''}" data-pick-panel="0">整页</button>`);
+            for (let k = 1; k <= panels.length; k++) {
+                panelPills.push(`<button type="button" class="sm-mini-pill ${t.panelNumber === k ? 'is-active' : ''}" data-pick-panel="${k}">第${k}格</button>`);
+            }
+        }
+
+        const thumbHtml = t.previewImage
+            ? `<img src="${escapeHtml(t.previewImage)}" alt="" class="sm-target-thumb">`
+            : '';
+        const panelLabel = t.panelNumber > 0 ? ` · 第 ${t.panelNumber} 格` : '';
+        const charLabel = t.characterName ? ` · ${t.characterEmoji || ''}${t.characterName}` : '';
+        const titleLabel = t.pageTitle ? `（${t.pageTitle}）` : '';
+
+        card.innerHTML = `
+            ${thumbHtml}
+            <div class="sm-target-body">
+                <div class="sm-target-summary">📍 《${escapeHtml(t.bookTitle)}》第 ${t.pageNumber} 页${escapeHtml(panelLabel)}${escapeHtml(charLabel)}${escapeHtml(titleLabel)}</div>
+                <div class="sm-target-pills-row">
+                    ${pagePills.join('')}
+                    ${panelPills.join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    _renderCharChips() {
+        const row = this.dom.charChipsRow;
+        if (!row) return;
+        const charsMap = this._activeBookData?.characters;
+        if (!this.editTarget.bookId || !charsMap || typeof charsMap !== 'object') {
+            row.hidden = true;
+            row.innerHTML = '';
+            return;
+        }
+
+        const orderedIds = [];
+        const seen = new Set();
+        const pageObj = this._activeBookData?.pages?.[this.editTarget.pageNumber - 1];
+        const panels = Array.isArray(pageObj?.panels) ? pageObj.panels : [];
+        const focusPanels = this.editTarget.panelNumber > 0 && panels[this.editTarget.panelNumber - 1]
+            ? [panels[this.editTarget.panelNumber - 1], ...panels]
+            : panels;
+
+        for (const pan of focusPanels) {
+            for (const b of (pan?.bubbles || [])) {
+                if (b.characterId && charsMap[b.characterId] && !seen.has(b.characterId)) {
+                    seen.add(b.characterId);
+                    orderedIds.push(b.characterId);
+                }
+            }
+        }
+        for (const cid of Object.keys(charsMap)) {
+            if (!seen.has(cid)) {
+                seen.add(cid);
+                orderedIds.push(cid);
+            }
+        }
+
+        if (orderedIds.length === 0) {
+            row.hidden = true;
+            row.innerHTML = '';
+            return;
+        }
+
+        row.hidden = false;
+        const pillsHtml = orderedIds.map((cid) => {
+            const ch = charsMap[cid];
+            const active = this.editTarget.characterId === cid ? 'is-active' : '';
+            return `<button type="button" class="sm-char-chip ${active}" data-char-id="${escapeHtml(cid)}">${escapeHtml(ch.emoji || '💬')} ${escapeHtml(ch.name || cid)}</button>`;
+        }).join('');
+        row.innerHTML = `<span class="sm-char-label">指给画师看：</span>${pillsHtml}`;
+    }
+
+    _buildWishTargetPayload() {
+        const t = this.editTarget || {};
+        return {
+            scope: t.bookId ? (t.panelNumber > 0 ? 'panel' : 'page') : 'new_book',
+            panelNumber: Number(t.panelNumber) || 0,
+            actionType: t.actionType || 'general',
+            characterId: t.characterId || '',
+            characterName: t.characterName || '',
+            characterEmoji: t.characterEmoji || '',
+            previewImage: t.previewImage || '',
+            pageTitle: t.pageTitle || '',
+            snippet: t.snippet || ''
+        };
+    }
+
+    _buildPageContextForAi() {
+        const bookData = this._activeBookData;
+        const t = this.editTarget || {};
+        if (!t.bookId || !bookData) return null;
+        const pageObj = bookData.pages?.[(t.pageNumber || 1) - 1];
+        if (!pageObj) return null;
+
+        const charsMap = bookData.characters || {};
+        const panels = Array.isArray(pageObj.panels) ? pageObj.panels : [];
+        const panelObj = t.panelNumber > 0 ? panels[t.panelNumber - 1] : null;
+        const storySummary = (pageObj.storyParagraphs || []).map((p) => p.text).join(' ').slice(0, 220);
+
+        const targetPanels = panelObj ? [panelObj] : panels;
+        const bubbleList = [];
+        const seenChars = new Set();
+        const charList = [];
+        for (const pan of targetPanels) {
+            for (const b of (pan?.bubbles || [])) {
+                const ch = charsMap[b.characterId];
+                const charName = ch?.name || b.characterId || '角色';
+                if (b.characterId && !seenChars.has(b.characterId)) {
+                    seenChars.add(b.characterId);
+                    charList.push({ name: charName, emoji: ch?.emoji || '' });
+                }
+                if (b.text && bubbleList.length < 5) {
+                    bubbleList.push({ characterName: charName, text: b.text });
+                }
+            }
+        }
+
+        return {
+            pageTitle: pageObj.title || '',
+            storySummary,
+            panelCaption: panelObj?.caption || panels[0]?.caption || '',
+            characters: charList,
+            bubbles: bubbleList
+        };
+    }
+
+    _renderDispatchBar() {
+        const bar = this.dom.dispatchBar;
+        const textEl = this.dom.dispatchText;
+        const btnEl = this.dom.dispatchBtn;
+        if (!bar || !textEl || !btnEl) return;
+
+        const pending = (this.state.wishes || []).filter((w) => w.syncedCloud && w.status === 'pending');
+        if (pending.length === 0 || !this._shouldUseCloudApi()) {
+            bar.hidden = true;
+            return;
+        }
+
+        bar.hidden = false;
+        const latestId = pending[pending.length - 1]?.id || '';
+        const alreadyDispatched = Boolean(latestId && this._dispatchedWishKey === latestId);
+        btnEl.disabled = this._dispatchBusy || alreadyDispatched;
+        if (alreadyDispatched) {
+            btnEl.textContent = '🚀 已通知开工';
+            textEl.textContent = '✨ 魔法画师已经拿起画笔，马上就变到书架上啦！';
+        } else {
+            btnEl.textContent = '🎨 说好啦，立刻开工';
+            textEl.textContent = '💬 还可以继续补充哦！聊完点右边立刻开工（或等 40 秒自动开画）';
+        }
+    }
+
+    async dispatchNow() {
+        if (this._dispatchBusy || !this._shouldUseCloudApi()) return null;
+        const pending = (this.state.wishes || []).filter((w) => w.syncedCloud && w.status === 'pending');
+        const latestId = pending[pending.length - 1]?.id || '';
+
+        this._dispatchBusy = true;
+        this._renderDispatchBar();
+        try {
+            const res = await fetch('/api/mailbox/dispatch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = res.ok ? await res.json().catch(() => null) : null;
+            if (res.ok && data?.ok) {
+                if (data.patrol && typeof data.patrol === 'object') {
+                    this._applyPatrolState(data.patrol);
+                }
+                if (latestId) this._dispatchedWishKey = latestId;
+                if (this.dom.statusHint) {
+                    this.dom.statusHint.textContent = '🚀 魔法画师已经收到确认清单，马上动笔画新页面啦！';
+                }
+                return data;
+            }
+            return null;
+        } catch (_) {
+            return null;
+        } finally {
+            this._dispatchBusy = false;
+            this._renderDispatchBar();
+        }
+    }
+
     _updateContextPill() {
         if (!this.dom.contextPill) return;
-        const ctx = this.getContext() || {};
-        if (ctx.view === 'reader' && ctx.bookTitle) {
-            const modeLabel = ctx.mode === 'comic' ? '漫画模式' : '绘本模式';
-            this.dom.contextPill.textContent = `📖 正在看：《${ctx.bookTitle}》第 ${ctx.pageNumber || 1} 页 · ${modeLabel}`;
+        const t = this.editTarget || {};
+        if (t.bookId && t.bookTitle) {
+            const modeLabel = t.mode === 'comic' ? '漫画模式' : '绘本模式';
+            const panelLabel = t.panelNumber > 0 ? ` · 第 ${t.panelNumber} 格` : '';
+            const charLabel = t.characterName ? ` · ${t.characterName}` : '';
+            this.dom.contextPill.textContent = `✏️ 选中：《${t.bookTitle}》第 ${t.pageNumber || 1} 页${panelLabel}${charLabel} · ${modeLabel}`;
         } else {
-            this.dom.contextPill.textContent = '📚 魔法书架 · 随时可以点播新故事';
+            this.dom.contextPill.textContent = '✨ 新编一本故事书 · 点上面书封可切换修改旧书';
         }
     }
 
@@ -574,13 +1027,30 @@ export class StoryMailboxController {
         });
     }
 
-    open() {
+    open(presetTarget = null) {
         this._ensureModalDom();
         this.onBeforeOpen();
         this.isOpen = true;
-        this._updateContextPill();
-        this._renderChips();
+
+        if (presetTarget && typeof presetTarget === 'object') {
+            this._setEditTarget(presetTarget);
+        } else {
+            const ctx = this.getContext() || {};
+            if (ctx.view === 'reader' && ctx.bookId) {
+                this._setEditTarget({
+                    scope: 'page',
+                    bookId: ctx.bookId,
+                    bookTitle: ctx.bookTitle,
+                    pageNumber: ctx.pageNumber || 1,
+                    mode: ctx.mode || 'storybook'
+                });
+            } else {
+                this._setEditTarget({ scope: 'new_book', bookId: '' });
+            }
+        }
+
         this._renderPatrolBar();
+        this._renderDispatchBar();
         this.dom.overlay.hidden = false;
 
         const unread = this.getUnreadReplies();
@@ -757,7 +1227,13 @@ export class StoryMailboxController {
     }
 
     _renderKidBubble(w) {
-        const locLabel = w.bookTitle ? `《${w.bookTitle}》P${w.pageNumber || 1}` : '魔法书架';
+        const t = w.target;
+        let locLabel = '✨ 编新书';
+        if (w.bookTitle) {
+            const panPart = t?.panelNumber > 0 ? `·第${t.panelNumber}格` : '';
+            const charPart = t?.characterName ? `·${t.characterEmoji || ''}${t.characterName}` : '';
+            locLabel = `《${w.bookTitle}》P${w.pageNumber || 1}${panPart}${charPart}`;
+        }
         const statusHtml = w.status === 'fulfilled'
             ? `<span class="sm-badge sm-badge-done">🌟 已画进书里啦</span>`
             : (w.syncedCloud
@@ -965,7 +1441,8 @@ export class StoryMailboxController {
             const elapsedSec = (Date.now() - (rec.startedAt || Date.now())) / 1000;
 
             const ctx = this.getContext() || {};
-            const whisperHints = String(ctx.whisperHints || '').trim().slice(0, 140);
+            const extraHints = [this.editTarget?.bookTitle, this.editTarget?.characterName, ctx.whisperHints].filter(Boolean);
+            const whisperHints = Array.from(new Set(extraHints)).join('，').slice(0, 140);
 
             if (rec.mode === 'mediarecorder' && rec.mediaRecorder) {
                 await new Promise((resolve) => {
@@ -1080,14 +1557,18 @@ export class StoryMailboxController {
         }
 
         const ctx = this.getContext() || {};
+        const t = this.editTarget || {};
+        const targetPayload = this._buildWishTargetPayload();
+        const pageContext = this._buildPageContextForAi();
         const wish = {
             id: `wish_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
             kidName: '小豌豆',
-            bookId: ctx.bookId || '',
-            bookTitle: ctx.bookTitle || '',
-            pageNumber: ctx.pageNumber || 1,
-            mode: ctx.view === 'reader' ? (ctx.mode || 'storybook') : 'shelf',
+            bookId: t.bookId || '',
+            bookTitle: t.bookTitle || '',
+            pageNumber: t.bookId ? (t.pageNumber || 1) : 1,
+            mode: t.bookId ? (t.mode || 'storybook') : 'shelf',
             text,
+            target: targetPayload,
             instantReplyKey: '',
             instantReplyText: '',
             status: 'pending',
@@ -1097,11 +1578,13 @@ export class StoryMailboxController {
         };
 
         this.isSending = true;
+        this._dispatchedWishKey = '';
         this._thinkingWishId = wish.id;
         this.state.wishes.push(wish);
         this.dom.textInput.value = '';
         this._saveLocalState();
         this._syncActionButtons();
+        this._renderDispatchBar();
         this.renderTimeline({ forceScroll: true });
         this.dom.statusHint.textContent = '🔮 魔法画师正在认真听你的点子…';
 
@@ -1114,7 +1597,7 @@ export class StoryMailboxController {
                 const res = await fetch('/api/mailbox/wish', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(wish)
+                    body: JSON.stringify({ ...wish, pageContext })
                 });
                 if (res.status === 404 || res.status === 405 || res.status === 501) {
                     this._cloudUnavailable = true;
@@ -1137,8 +1620,8 @@ export class StoryMailboxController {
             }
 
             if (!replyText) {
-                replyText = ctx.bookTitle
-                    ? `太有想象力啦小豌豆！你说的「${text.slice(0, 26)}」放在《${ctx.bookTitle}》里一定超级精彩，我已经用魔法画笔记下来啦！`
+                replyText = t.bookTitle
+                    ? `太有想象力啦小豌豆！你说的「${text.slice(0, 26)}」放在《${t.bookTitle}》里一定超级精彩，我已经用魔法画笔记下来啦！`
                     : `哇塞小豌豆！你说的「${text.slice(0, 26)}」真像童话里的魔法，我已经记进魔法画本里啦，马上就去帮你画出来！`;
             }
 
@@ -1147,6 +1630,7 @@ export class StoryMailboxController {
             this._thinkingWishId = null;
             this._saveLocalState();
             this.renderTimeline({ forceScroll: true });
+            this._renderDispatchBar();
             this.refreshBadges();
 
             const playKey = `inst_${wish.id}`;
@@ -1234,6 +1718,7 @@ export class StoryMailboxController {
 
             if (this.isOpen) {
                 this._markAllRepliesRead();
+                this._renderDispatchBar();
                 const nextFp = this._getTimelineFingerprint();
                 if (nextFp !== this._lastRenderedFingerprint) {
                     this.renderTimeline({ forceScroll: false });

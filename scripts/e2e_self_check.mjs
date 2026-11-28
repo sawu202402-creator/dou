@@ -72,7 +72,8 @@ function startLocalServer() {
         expiresAt: 0,
         remainingMinutes: 0
     };
-    const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0, patrolPostCalls: 0, lastWhisperHints: '' };
+    const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0, patrolPostCalls: 0, dispatchCalls: 0, lastWhisperHints: '' };
+    let dispatchRequestedAt = 0;
     let liveVersionObj = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
 
     const srv = http.createServer((req, res) => {
@@ -145,6 +146,7 @@ function startLocalServer() {
                     patrolState.updatedBy = 'auto_wish';
                     patrolState.expiresAt = Date.now() + 60 * 60 * 1000;
                     patrolState.remainingMinutes = 60;
+                    dispatchRequestedAt = 0;
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         ok: true,
@@ -203,13 +205,35 @@ function startLocalServer() {
                         return;
                     }
                     const pendingWishes = memWishes.filter((w) => w.status === 'pending');
+                    const latestPendingAt = pendingWishes.reduce((mx, w) => Math.max(mx, Number(w.createdAt) || 0), 0);
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         ok: true,
                         patrol: patrolState,
                         pendingCount: pendingWishes.length,
                         pendingWishes,
+                        latestPendingAt,
+                        dispatchRequestedAt,
                         serverTime: Date.now()
+                    }));
+                    return;
+                }
+                if (req.method === 'POST' && urlPath === '/api/mailbox/dispatch') {
+                    mailboxLog.dispatchCalls += 1;
+                    dispatchRequestedAt = Date.now();
+                    patrolState.enabled = true;
+                    patrolState.updatedAt = dispatchRequestedAt;
+                    patrolState.updatedBy = 'user_dispatch';
+                    patrolState.expiresAt = dispatchRequestedAt + 60 * 60 * 1000;
+                    patrolState.remainingMinutes = 60;
+                    const pendingWishes = memWishes.filter((w) => w.status === 'pending');
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        ok: true,
+                        patrol: patrolState,
+                        dispatchRequestedAt,
+                        pendingCount: pendingWishes.length,
+                        serverTime: dispatchRequestedAt
                     }));
                     return;
                 }
@@ -469,6 +493,16 @@ async function main() {
         );
         console.log('✓ [590x820] 顶部与弹窗巡检开关联动（默认关 → 顶部开 → 弹窗关）通过');
 
+        // 验证书架弹窗内选书条、目标缩略图卡与角色头像选择
+        await waitFor(`Boolean(document.querySelector('.sm-book-pick-btn[data-pick-book="moon-dessert-shop"]'))`, 3000, 'book picker buttons');
+        await evalJs(`document.querySelector('.sm-book-pick-btn[data-pick-book="moon-dessert-shop"]').click()`);
+        await waitFor(`document.getElementById('smTargetCard').hidden === false && document.querySelectorAll('.sm-char-chip').length >= 3`, 4000, 'target card & char chips');
+        await evalJs(`document.querySelector('.sm-char-chip').click()`);
+        assert.equal(await evalJs(`document.querySelector('.sm-char-chip').classList.contains('is-active')`), true, '点击角色头像应高亮选中');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '展开选书卡后弹窗存在横向溢出');
+        await evalJs(`document.querySelector('.sm-book-pick-btn[data-pick-book=""]').click()`);
+        await waitFor(`document.getElementById('smTargetCard').hidden === true && document.getElementById('smCharChipsRow').hidden === true`, 2000, 'switch back to new book');
+
         // 真实模拟麦克风录音 -> /api/mailbox/transcribe
         await evalJs(`document.getElementById('smMicBtn').click()`);
         await waitFor(`window.__PEA_STORY_HOUSE__.mailbox.isRecording === true`, 3000, 'mic recording start');
@@ -477,7 +511,7 @@ async function main() {
         await waitFor(`document.getElementById('smTextInput').value.includes('草莓飞机')`, 4000, 'whisper transcript');
         assert.ok(mailboxLog.transcribeCalls >= 1, '应当调用 /api/mailbox/transcribe 转写录音');
 
-        // 发送留言 -> /api/mailbox/wish AI 实时回复 + 自动唤醒开启巡检（并支持手动关回）
+        // 发送留言 -> /api/mailbox/wish AI 实时回复 + 自动唤醒开启巡检 + 「立刻开工」按钮可用
         await evalJs(`document.getElementById('smSendBtn').click()`);
         await waitFor(
             `window.__PEA_STORY_HOUSE__.mailbox.isSending === false && !document.getElementById('smThinkingRow') && document.querySelectorAll('.sm-from-kid').length >= 1 && document.querySelectorAll('.sm-badge-live').length >= 1`,
@@ -490,6 +524,10 @@ async function main() {
             3000,
             'wish auto-enables patrol switch'
         );
+        assert.equal(await evalJs(`document.getElementById('smDispatchBar').hidden`), false, '发完点子后应显示「说好啦，立刻开工」提示栏');
+        await evalJs(`document.getElementById('smDispatchBtn').click()`);
+        await waitFor(`document.getElementById('smDispatchBtn').disabled === true`, 3000, 'dispatch now clicked');
+        assert.ok(mailboxLog.dispatchCalls >= 1, '点击立刻开工应请求 POST /api/mailbox/dispatch');
         await evalJs(`document.getElementById('smPatrolSwitch').click()`);
         await waitFor(`document.getElementById('live-status').getAttribute('aria-pressed') === 'false'`, 3000, 'restore patrol OFF');
         await saveScreenshot(cdp, sessionId, '07-split-mailbox.png');
@@ -556,6 +594,16 @@ async function main() {
         await evalJs(`document.getElementById('btn-speed').click()`);
         assert.equal(await evalJs(`window.__PEA_STORY_HOUSE__.getState().slowMode`), false, '再次点击应恢复常速');
 
+        // 测试绘本「✏️ 改这一页」直达弹窗并自动带入当前书页锚点
+        await evalJs(`document.getElementById('btn-edit-storybook-page').click()`);
+        await waitFor(
+            `document.getElementById('storyMailboxOverlay').hidden === false && document.getElementById('smTargetCard').hidden === false && window.__PEA_STORY_HOUSE__.mailbox.editTarget.bookId === 'moon-dessert-shop' && window.__PEA_STORY_HOUSE__.mailbox.editTarget.pageNumber === 1`,
+            3000,
+            'storybook edit page target'
+        );
+        await evalJs(`document.getElementById('smCloseBtn').click()`);
+        await waitFor(`document.getElementById('storyMailboxOverlay').hidden === true`, 2000, 'close storybook edit modal');
+
         await saveScreenshot(cdp, sessionId, '02-split-storybook.png');
 
         // 绘本 4 页翻页 & 大图全检
@@ -605,6 +653,17 @@ async function main() {
 
             if (p === 0) {
                 await saveScreenshot(cdp, sessionId, '03-split-comic-p1.png');
+                // 测试漫画分镜「✏️ 改这格」直达第 2 格精准锚点
+                assert.ok(await evalJs(`document.querySelectorAll('.btn-edit-panel').length >= 3`), '每个漫画面板都应有改这格按钮');
+                await evalJs(`document.querySelectorAll('.btn-edit-panel')[1].click()`);
+                await waitFor(
+                    `document.getElementById('storyMailboxOverlay').hidden === false && window.__PEA_STORY_HOUSE__.mailbox.editTarget.panelNumber === 2 && document.getElementById('smTargetCard').textContent.includes('第 2 格')`,
+                    3000,
+                    'comic panel 2 edit target'
+                );
+                await evalJs(`document.getElementById('smCloseBtn').click()`);
+                await waitFor(`document.getElementById('storyMailboxOverlay').hidden === true`, 2000, 'close comic edit modal');
+
                 // 测试漫画插画点击放大看细节
                 await evalJs(`document.querySelector('.comic-art-zoom-btn').click()`);
                 await waitFor(`document.getElementById('art-lightbox').hidden === false && document.getElementById('art-lightbox-img').complete && document.getElementById('art-lightbox-img').naturalWidth > 0`, 3000, 'open comic lightbox');

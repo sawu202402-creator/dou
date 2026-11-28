@@ -42,6 +42,66 @@ function cleanStr(val, maxLen = 600) {
     return String(val).trim().slice(0, maxLen);
 }
 
+function safeParseJson(str) {
+    if (!str || typeof str !== "string") return null;
+    try {
+        const obj = JSON.parse(str);
+        return obj && typeof obj === "object" ? obj : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+const VALID_SCOPES = new Set(["new_book", "book", "page", "panel"]);
+const VALID_ACTIONS = new Set(["art", "dialogue", "voice", "next_page", "general"]);
+
+function sanitizeTarget(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const scope = VALID_SCOPES.has(raw.scope) ? raw.scope : "page";
+    const panelNumber = Math.max(0, Math.min(20, Math.floor(Number(raw.panelNumber) || 0)));
+    const actionType = VALID_ACTIONS.has(raw.actionType) ? raw.actionType : "general";
+    const characterId = cleanStr(raw.characterId, 48);
+    const characterName = cleanStr(raw.characterName, 32);
+    const characterEmoji = cleanStr(raw.characterEmoji, 16);
+    const previewImage = cleanStr(raw.previewImage, 220);
+    const pageTitle = cleanStr(raw.pageTitle, 80);
+    const snippet = cleanStr(raw.snippet, 180);
+    return {
+        scope,
+        panelNumber,
+        actionType,
+        characterId,
+        characterName,
+        characterEmoji,
+        previewImage,
+        pageTitle,
+        snippet
+    };
+}
+
+function sanitizePageContext(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const pageTitle = cleanStr(raw.pageTitle, 80);
+    const storySummary = cleanStr(raw.storySummary, 240);
+    const panelCaption = cleanStr(raw.panelCaption, 140);
+    const characters = Array.isArray(raw.characters)
+        ? raw.characters.slice(0, 8).map((c) => ({
+            name: cleanStr(c?.name, 24),
+            emoji: cleanStr(c?.emoji, 12)
+        })).filter((c) => c.name)
+        : [];
+    const bubbles = Array.isArray(raw.bubbles)
+        ? raw.bubbles.slice(0, 6).map((b) => ({
+            characterName: cleanStr(b?.characterName, 24),
+            text: cleanStr(b?.text, 80)
+        })).filter((b) => b.text)
+        : [];
+    if (!pageTitle && !storySummary && !panelCaption && characters.length === 0 && bubbles.length === 0) {
+        return null;
+    }
+    return { pageTitle, storySummary, panelCaption, characters, bubbles };
+}
+
 function formatBeijingTimeStr(tsMs = Date.now()) {
     const d = new Date(Number(tsMs) + 8 * 3600 * 1000);
     const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -200,30 +260,59 @@ async function transcribeAudioFast(aiBinding, { rawBytes = null, audioBase64 = "
     return { text: txt2, model: "@cf/openai/whisper" };
 }
 
-function buildStoryArtistSystemPrompt({ bookTitle, pageNumber, mode }) {
-    const contextDesc = bookTitle
-        ? `当前小豌豆正在看《${bookTitle}》第 ${pageNumber || 1} 页（${mode === "comic" ? "彩色多格漫画模式" : "精装有声绘本模式"}）。`
-        : "当前小豌豆正在她的魔法书架前挑选故事书。";
+const ACTION_LABELS = {
+    art: "修改插画画面",
+    dialogue: "修改文字/台词",
+    voice: "调整角色配音",
+    next_page: "续写新的一页",
+    general: "改进或新增内容"
+};
+
+function buildStoryArtistSystemPrompt({ bookTitle, pageNumber, mode, target = null, pageContext = null }) {
+    const contextLines = [];
+    if (bookTitle) {
+        const panelPart = target?.panelNumber > 0 ? `第 ${target.panelNumber} 格` : "";
+        const charPart = target?.characterName ? `，重点关注角色【${target.characterName}】` : "";
+        const actionPart = target?.actionType && ACTION_LABELS[target.actionType] ? `（意图：${ACTION_LABELS[target.actionType]}）` : "";
+        contextLines.push(
+            `当前小豌豆选中的位置是《${bookTitle}》第 ${pageNumber || 1} 页${panelPart}${mode === "comic" ? "（漫画模式）" : "（绘本模式）"}${charPart}${actionPart}。`
+        );
+    } else {
+        contextLines.push("当前小豌豆准备新编一本原创故事书。");
+    }
+
+    if (pageContext) {
+        if (pageContext.pageTitle) contextLines.push(`这一页标题：《${pageContext.pageTitle}》。`);
+        if (pageContext.panelCaption) contextLines.push(`当前格旁白：“${pageContext.panelCaption}”。`);
+        if (pageContext.storySummary) contextLines.push(`这一页故事内容：${pageContext.storySummary}`);
+        if (Array.isArray(pageContext.characters) && pageContext.characters.length > 0) {
+            contextLines.push(`本页出场角色：${pageContext.characters.map((c) => c.name).join("、")}。`);
+        }
+        if (Array.isArray(pageContext.bubbles) && pageContext.bubbles.length > 0) {
+            const bLines = pageContext.bubbles.map((b) => `${b.characterName || "角色"}说「${b.text}」`).join("；");
+            contextLines.push(`对话台词：${bLines}。`);
+        }
+    }
 
     return [
-        "你是【🐰 小豌豆魔法故事漫画屋】里温柔、风趣、充满想象力的「魔法故事画师大姐姐」，正在陪伴二年级小朋友【小豌豆】一起创作原创绘本与彩色漫画。",
-        contextDesc,
+        "你是【🐰 小豌豆魔法故事漫画屋】里温柔、风趣、充满想象力的「魔法故事画师大姐姐」，正在陪伴二年级小朋友【小豌豆】一起创作或修改原创绘本与彩色漫画。",
+        ...contextLines,
         "请严格遵守以下回复准则：",
-        "1. 亲切称呼“小豌豆”，认真倾听并回应她的每一个想法。",
-        "2. 如果小豌豆提出了想画的新故事、续写下一页、改某页台词/剧情、加新角色或神奇魔法：请先热烈夸奖她的灵感并顺着她的脑洞畅想一下画面有多棒，再告诉她「我已经用魔法画笔记进云端魔法画本里啦，很快就会画成全彩绘本和漫画变到你的书架上！」。",
-        "3. 如果小豌豆只是打招呼、问问题或讲日常趣事：请用温暖、有童趣、适合二年级小朋友听的语言陪她聊天互动。",
-        "4. 字数控制在 45 到 115 个汉字之间，纯自然口语段落，不要使用换行列表、星号或 Markdown 符号，最多带 1 到 2 个可爱表情，方便直接转成温柔真人语音。",
+        "1. 亲切称呼“小豌豆”，结合上面看到的当前页/格画面和角色，认真回应她的想法。",
+        "2. 如果小豌豆说得比较笼统（比如只说“不好看”“想改一下”而没说明改哪里）：先夸夸她的好眼光，然后结合当前这页的画面或角色提 1 个暖心具体的小选择题（例如“是想给XX换个造型/颜色，还是想让它改一句台词呀？”），温柔引导她用 1 句话说清楚。",
+        "3. 如果小豌豆的创作或修改想法已经很明确（比如换衣服颜色、加新动物、改配音、续写下一页）：先热烈夸赞并简单复述确认你记下的修改位置和内容，再告诉她「我已经记进云端画本里啦！如果还有补充可以继续说，说完点下面的「说好啦，立刻开工」我就马上动笔画哦！」。",
+        "4. 字数控制在 45 到 120 个汉字之间，纯自然口语段落，不要使用换行列表、星号或 Markdown 符号，最多带 1 到 2 个可爱表情，方便直接转成温柔真人语音。",
         "5. 内容绝对健康安全，鼓励想象力。不要输出思考过程，直接输出对小豌豆说的话。"
     ].join("\n");
 }
 
-async function generateStoryArtistReply(aiBinding, { text, bookTitle = "", pageNumber = 1, mode = "storybook", recentTurns = [] }) {
+async function generateStoryArtistReply(aiBinding, { text, bookTitle = "", pageNumber = 1, mode = "storybook", target = null, pageContext = null, recentTurns = [] }) {
     if (!aiBinding || typeof aiBinding.run !== "function") {
         return null;
     }
 
     const messages = [
-        { role: "system", content: buildStoryArtistSystemPrompt({ bookTitle, pageNumber, mode }) }
+        { role: "system", content: buildStoryArtistSystemPrompt({ bookTitle, pageNumber, mode, target, pageContext }) }
     ];
 
     for (const turn of recentTurns.slice(-6)) {
@@ -241,7 +330,7 @@ async function generateStoryArtistReply(aiBinding, { text, bookTitle = "", pageN
         try {
             const payload = {
                 messages,
-                max_tokens: 260,
+                max_tokens: 280,
                 temperature: 0.76
             };
             if (modelId.includes("qwen3")) {
@@ -257,12 +346,14 @@ async function generateStoryArtistReply(aiBinding, { text, bookTitle = "", pageN
     return null;
 }
 
-function buildFallbackArtistReply(text, bookTitle) {
+function buildFallbackArtistReply(text, bookTitle, target = null) {
     const snippet = cleanStr(text, 28);
     if (bookTitle) {
-        return `哇，小豌豆的想象力闪闪发光！你刚说的「${snippet}」放在《${bookTitle}》里一定超精彩，我已经记进云端魔法画本里啦，很快就会画好送到你书架上哦！`;
+        const panelText = target?.panelNumber > 0 ? `第 ${target.panelNumber} 格` : "";
+        const charText = target?.characterName ? `的${target.characterName}` : "";
+        return `收到小豌豆的好主意！关于《${bookTitle}》${panelText}${charText}的「${snippet}」我已经记进云端画本啦！还要补充可以继续说，说完点下面「说好啦，立刻开工」我就马上画！`;
     }
-    return `太棒啦小豌豆！你说的「${snippet}」充满童话魔法感，我已经拿彩色画笔记进云端魔法画本里啦，很快就会变成新故事摆上你的书架哦！`;
+    return `太棒啦小豌豆！你说的「${snippet}」充满童话魔法感，我已经记进云端魔法画本里啦！还要补充可以继续说，说完点下面「说好啦，立刻开工」我就马上画！`;
 }
 
 export class StoryMailboxDO extends DurableObject {
@@ -302,6 +393,9 @@ export class StoryMailboxDO extends DurableObject {
                     updated_at INTEGER NOT NULL
                 );
             `);
+            try {
+                this.ctx.storage.sql.exec(`ALTER TABLE story_wishes ADD COLUMN target_json TEXT DEFAULT ''`);
+            } catch (_) {}
         });
     }
 
@@ -371,27 +465,36 @@ export class StoryMailboxDO extends DurableObject {
     }
 
     _readPendingWishes() {
-        return this.ctx.storage.sql.exec(
+        const rows = this.ctx.storage.sql.exec(
             `SELECT id, kid_name AS kidName, book_id AS bookId, book_title AS bookTitle,
-                    page_number AS pageNumber, mode, text,
+                    page_number AS pageNumber, mode, text, target_json AS targetJson,
                     created_at AS createdAt, created_str AS createdStr
              FROM story_wishes
              WHERE status = 'pending'
              ORDER BY created_at ASC
              LIMIT 20`
         ).toArray();
+        return rows.map(({ targetJson, ...rest }) => ({
+            ...rest,
+            target: safeParseJson(targetJson)
+        }));
     }
 
     _readAll() {
-        const wishes = this.ctx.storage.sql.exec(
+        const rawWishes = this.ctx.storage.sql.exec(
             `SELECT id, kid_name AS kidName, book_id AS bookId, book_title AS bookTitle,
-                    page_number AS pageNumber, mode, text,
+                    page_number AS pageNumber, mode, text, target_json AS targetJson,
                     instant_reply_key AS instantReplyKey, instant_reply_text AS instantReplyText,
                     status, created_at AS createdAt, created_str AS createdStr
              FROM story_wishes
              ORDER BY created_at ASC
              LIMIT 200`
         ).toArray();
+
+        const wishes = rawWishes.map(({ targetJson, ...rest }) => ({
+            ...rest,
+            target: safeParseJson(targetJson)
+        }));
 
         const replies = this.ctx.storage.sql.exec(
             `SELECT id, reply_to_id AS replyToId, sender_name AS senderName,
@@ -416,6 +519,8 @@ export class StoryMailboxDO extends DurableObject {
         const bookTitle = cleanStr(raw.bookTitle, 80);
         const pageNumber = Math.max(1, Number(raw.pageNumber) || 1);
         const mode = cleanStr(raw.mode, 24) || "shelf";
+        const cleanTarget = sanitizeTarget(raw.target);
+        const targetJson = cleanTarget ? JSON.stringify(cleanTarget).slice(0, 1600) : "";
         const instantReplyKey = cleanStr(raw.instantReplyKey, 48);
         const instantReplyText = cleanStr(raw.instantReplyText, 600);
         const createdAt = Number(raw.createdAt) > 0 ? Math.floor(Number(raw.createdAt)) : now;
@@ -423,12 +528,13 @@ export class StoryMailboxDO extends DurableObject {
 
         this.ctx.storage.sql.exec(
             `INSERT INTO story_wishes
-                (id, kid_name, book_id, book_title, page_number, mode, text, instant_reply_key, instant_reply_text, status, created_at, created_str)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                (id, kid_name, book_id, book_title, page_number, mode, text, target_json, instant_reply_key, instant_reply_text, status, created_at, created_str)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
              ON CONFLICT(id) DO UPDATE SET
+                target_json = CASE WHEN excluded.target_json != '' THEN excluded.target_json ELSE story_wishes.target_json END,
                 instant_reply_key = CASE WHEN excluded.instant_reply_key != '' THEN excluded.instant_reply_key ELSE story_wishes.instant_reply_key END,
                 instant_reply_text = CASE WHEN excluded.instant_reply_text != '' THEN excluded.instant_reply_text ELSE story_wishes.instant_reply_text END`,
-            id, kidName, bookId, bookTitle, pageNumber, mode, text, instantReplyKey, instantReplyText, createdAt, createdStr
+            id, kidName, bookId, bookTitle, pageNumber, mode, text, targetJson, instantReplyKey, instantReplyText, createdAt, createdStr
         );
 
         this.ctx.storage.sql.exec(
@@ -436,7 +542,10 @@ export class StoryMailboxDO extends DurableObject {
                 SELECT id FROM story_wishes ORDER BY created_at DESC LIMIT 200
             )`
         );
-        return { id, kidName, bookId, bookTitle, pageNumber, mode, text, instantReplyKey, instantReplyText, createdAt, createdStr };
+        return {
+            id, kidName, bookId, bookTitle, pageNumber, mode, text,
+            target: cleanTarget, instantReplyKey, instantReplyText, createdAt, createdStr
+        };
     }
 
     async fetch(request) {
@@ -464,12 +573,32 @@ export class StoryMailboxDO extends DurableObject {
                     this._setSetting("watcher_heartbeat_at", String(Date.now()));
                 }
                 const pendingWishes = this._readPendingWishes();
+                const latestPendingAt = pendingWishes.reduce((mx, w) => Math.max(mx, Number(w.createdAt) || 0), 0);
+                const dispatchRequestedAt = Number(this._getSetting("dispatch_now_at", "0").value) || 0;
                 return jsonResponse({
                     ok: true,
                     patrol: this._getPatrolState(),
                     pendingCount: pendingWishes.length,
                     pendingWishes,
+                    latestPendingAt,
+                    dispatchRequestedAt,
                     serverTime: Date.now()
+                });
+            }
+
+            if (request.method === "POST" && path === "/api/mailbox/dispatch") {
+                const now = Date.now();
+                this._setSetting("patrol_enabled", "1", now);
+                this._setSetting("patrol_updated_by", "user_dispatch", now);
+                this._setSetting("patrol_expires_at", String(now + PATROL_AUTO_OFF_MS), now);
+                this._setSetting("dispatch_now_at", String(now), now);
+                const pendingWishes = this._readPendingWishes();
+                return jsonResponse({
+                    ok: true,
+                    patrol: this._getPatrolState(),
+                    dispatchRequestedAt: now,
+                    pendingCount: pendingWishes.length,
+                    serverTime: now
                 });
             }
 
@@ -517,9 +646,13 @@ export class StoryMailboxDO extends DurableObject {
                 this._setSetting("patrol_enabled", "1", wakeNow);
                 this._setSetting("patrol_updated_by", "auto_wish", wakeNow);
                 this._setSetting("patrol_expires_at", String(wakeNow + PATROL_AUTO_OFF_MS), wakeNow);
+                this._setSetting("dispatch_now_at", "0", wakeNow);
+
+                const wishTarget = savedWish?.target || sanitizeTarget(body.target);
+                const pageContext = sanitizePageContext(body.pageContext);
 
                 let replyKey = "local_fallback";
-                let replyText = cleanStr(body.fallbackReplyText, 600) || buildFallbackArtistReply(text, bookTitle);
+                let replyText = cleanStr(body.fallbackReplyText, 600) || buildFallbackArtistReply(text, bookTitle, wishTarget);
                 let aiGenerated = false;
                 let aiModel = "";
                 let audioBase64 = "";
@@ -529,6 +662,8 @@ export class StoryMailboxDO extends DurableObject {
                     bookTitle,
                     pageNumber,
                     mode,
+                    target: wishTarget,
+                    pageContext,
                     recentTurns: prevData.wishes.slice(-6)
                 });
 
@@ -619,6 +754,9 @@ export class StoryMailboxDO extends DurableObject {
                     const ids = replyToId.split(",").map((s) => s.trim()).filter(Boolean);
                     for (const wid of ids) {
                         this.ctx.storage.sql.exec(`UPDATE story_wishes SET status = 'fulfilled' WHERE id = ?`, wid);
+                    }
+                    if (this._readPendingWishes().length === 0) {
+                        this._setSetting("dispatch_now_at", "0", now);
                     }
                 }
 

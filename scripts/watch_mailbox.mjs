@@ -9,7 +9,7 @@
  *   从而自动唤醒 Antigravity 按 GEMINI.md 的 5 步流水线开始画新书！
  *
  * 用法：
- *   node scripts/watch_mailbox.mjs [--url https://...] [--idle-sec 25] [--active-sec 8] [--once]
+ *   node scripts/watch_mailbox.mjs [--url https://...] [--idle-sec 25] [--active-sec 8] [--debounce-sec 40] [--once]
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -88,12 +88,14 @@ async function main() {
 
     const idleSec = Math.max(5, Number(args['idle-sec']) || 25);
     const activeSec = Math.max(3, Number(args['active-sec']) || 8);
+    const debounceSec = Math.max(0, Number(args['debounce-sec'] ?? 40));
     const once = Boolean(args.once);
 
-    console.log(`[${ts()}] 🐇 零 Token 魔法信箱哨兵已启动 -> ${baseUrl} (关闭低频 ${idleSec}s / 开启高频 ${activeSec}s)`);
+    console.log(`[${ts()}] 🐇 零 Token 魔法信箱哨兵已启动 -> ${baseUrl} (关闭低频 ${idleSec}s / 开启高频 ${activeSec}s / 连聊缓冲 ${debounceSec}s)`);
 
     let lastPatrolEnabled = null;
     let lastErrorKey = '';
+    let lastDebounceKey = '';
 
     while (true) {
         let nextDelaySec = idleSec;
@@ -118,17 +120,44 @@ async function main() {
             }
 
             if (patrolEnabled && pendingCount > 0 && pendingWishes.length > 0) {
-                console.log(`\n[${ts()}] 🌟 检测到网页巡检已开启且有 ${pendingWishes.length} 条小豌豆新点子待处理！`);
-                for (const w of pendingWishes) {
-                    const loc = w.bookTitle ? `《${w.bookTitle}》第${w.pageNumber || 1}页 (${w.mode || 'storybook'})` : '魔法书架';
-                    console.log(`- [${w.id}] (${w.createdStr || ''}) ${w.kidName || '小豌豆'} @ ${loc}`);
-                    console.log(`  💬 “${w.text}”`);
-                }
-                console.log('\n🚀 立即退出哨兵并唤醒画师开始创作！');
-                process.exit(0);
-            }
+                const serverNow = Number(data.serverTime) || Date.now();
+                const latestPendingAt = Number(data.latestPendingAt) || pendingWishes.reduce((mx, w) => Math.max(mx, Number(w.createdAt) || 0), 0);
+                const dispatchRequestedAt = Number(data.dispatchRequestedAt) || 0;
+                const userDispatched = dispatchRequestedAt > 0 && dispatchRequestedAt >= latestPendingAt;
+                const quietSec = latestPendingAt > 0 ? Math.max(0, (serverNow - latestPendingAt) / 1000) : debounceSec;
 
-            nextDelaySec = patrolEnabled ? activeSec : idleSec;
+                if (userDispatched || quietSec >= debounceSec) {
+                    console.log(`\n[${ts()}] 🌟 ${userDispatched ? '小豌豆已点击「立刻开工」' : `已静默等待 ${Math.round(quietSec)}s 确认说完`}，共 ${pendingWishes.length} 条新点子待处理！`);
+                    for (const w of pendingWishes) {
+                        const loc = w.bookTitle ? `《${w.bookTitle}》第${w.pageNumber || 1}页 (${w.mode || 'storybook'})` : '魔法书架';
+                        console.log(`- [${w.id}] (${w.createdStr || ''}) ${w.kidName || '小豌豆'} @ ${loc}`);
+                        if (w.target && typeof w.target === 'object') {
+                            const tParts = [
+                                w.target.scope ? `范围=${w.target.scope}` : '',
+                                w.target.panelNumber > 0 ? `第${w.target.panelNumber}格` : '',
+                                w.target.characterName ? `角色=${w.target.characterEmoji || ''}${w.target.characterName}` : '',
+                                w.target.actionType ? `意图=${w.target.actionType}` : '',
+                                w.target.snippet ? `原文=“${w.target.snippet}”` : ''
+                            ].filter(Boolean);
+                            if (tParts.length > 0) console.log(`  🎯 定位：${tParts.join(' · ')}`);
+                        }
+                        console.log(`  💬 “${w.text}”`);
+                    }
+                    console.log('\n🚀 立即退出哨兵并唤醒画师开始创作！');
+                    process.exit(0);
+                } else {
+                    const remainSec = Math.max(1, Math.ceil(debounceSec - quietSec));
+                    const dKey = `${pendingCount}:${latestPendingAt}`;
+                    if (once || dKey !== lastDebounceKey) {
+                        console.log(`[${ts()}] ⏳ 收到 ${pendingCount} 条留言，正在等小豌豆补充完（约 ${remainSec}s 后或点「立刻开工」即唤醒）…`);
+                        lastDebounceKey = dKey;
+                    }
+                    nextDelaySec = Math.min(activeSec, Math.max(3, remainSec));
+                }
+            } else {
+                lastDebounceKey = '';
+                nextDelaySec = patrolEnabled ? activeSec : idleSec;
+            }
         } catch (err) {
             const msg = String(err?.message || err);
             const errKey = msg.slice(0, 80);

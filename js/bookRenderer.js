@@ -123,7 +123,8 @@ export function renderStorybookPage(container, book, page, {
     totalPages = 1,
     speakingKey = '',
     onSpeakParagraph,
-    onSpeakPage
+    onSpeakPage,
+    onEditPage
 } = {}) {
     if (!container || !book || !page) return;
 
@@ -161,6 +162,9 @@ export function renderStorybookPage(container, book, page, {
                     <button type="button" class="btn-read-page" id="btn-read-storybook-page">
                         🔊 朗读这一页
                     </button>
+                    <button type="button" class="btn-edit-page" id="btn-edit-storybook-page">
+                        ✏️ 改这一页
+                    </button>
                     <span class="storybook-tip">点任意一段文字也可以单独朗读哦</span>
                 </footer>
             </div>
@@ -169,11 +173,21 @@ export function renderStorybookPage(container, book, page, {
 
     const artBtn = container.querySelector('#btn-storybook-art');
     const pageBtn = container.querySelector('#btn-read-storybook-page');
+    const editBtn = container.querySelector('#btn-edit-storybook-page');
     if (artBtn && typeof onSpeakPage === 'function') {
         artBtn.addEventListener('click', () => onSpeakPage());
     }
     if (pageBtn && typeof onSpeakPage === 'function') {
         pageBtn.addEventListener('click', () => onSpeakPage());
+    }
+    if (editBtn && typeof onEditPage === 'function') {
+        editBtn.addEventListener('click', () => onEditPage({
+            scope: 'page',
+            bookId: book.id,
+            bookTitle: book.title,
+            pageNumber: page.pageNumber,
+            mode: 'storybook'
+        }));
     }
 
     container.querySelectorAll('.story-para-btn').forEach((btn) => {
@@ -195,7 +209,8 @@ export function renderComicPage(container, book, page, {
     totalPages = 1,
     speakingKey = '',
     onSpeakItem,
-    onZoomImage
+    onZoomImage,
+    onEditTarget
 } = {}) {
     if (!container || !book || !page) return;
 
@@ -272,6 +287,10 @@ export function renderComicPage(container, book, page, {
 
         return `
             <div class="comic-panel panel-idx-${pIdx}" data-panel-idx="${pIdx}">
+                <div class="comic-panel-bar">
+                    <span class="comic-panel-label">第 ${pIdx + 1} 格</span>
+                    <button type="button" class="btn-edit-panel" data-panel-idx="${pIdx}" aria-label="修改第 ${pIdx + 1} 格">✏️ 改这格</button>
+                </div>
                 ${captionHtml}
                 <div class="comic-art-box">
                     <button type="button" class="comic-art-zoom-btn" data-zoom-src="${escapeHtml(panel.image)}" data-zoom-caption="${escapeHtml(panel.caption || page.title)}" aria-label="点击放大查看第 ${pIdx + 1} 格插画">
@@ -291,6 +310,7 @@ export function renderComicPage(container, book, page, {
                 <div class="comic-title-row">
                     <span class="chapter-badge">${escapeHtml(book.emoji || '🐰')} 第 ${pageIndex + 1} / ${totalPages} 页</span>
                     <h2 class="comic-page-title">${renderPinyinHtml(page.title, page.titlePinyin)}</h2>
+                    <button type="button" class="btn-edit-page btn-edit-page-sm" id="btn-edit-comic-page">✏️ 改这一页</button>
                 </div>
                 <div class="comic-cast-bar">
                     <div class="cast-pills">${castPills}</div>
@@ -302,6 +322,33 @@ export function renderComicPage(container, book, page, {
             </div>
         </section>
     `;
+
+    const editComicPageBtn = container.querySelector('#btn-edit-comic-page');
+    if (editComicPageBtn && typeof onEditTarget === 'function') {
+        editComicPageBtn.addEventListener('click', () => onEditTarget({
+            scope: 'page',
+            bookId: book.id,
+            bookTitle: book.title,
+            pageNumber: page.pageNumber,
+            mode: 'comic'
+        }));
+    }
+
+    container.querySelectorAll('.btn-edit-panel').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const pIdx = Number(btn.getAttribute('data-panel-idx'));
+            if (typeof onEditTarget === 'function') {
+                onEditTarget({
+                    scope: 'panel',
+                    bookId: book.id,
+                    bookTitle: book.title,
+                    pageNumber: page.pageNumber,
+                    panelNumber: pIdx + 1,
+                    mode: 'comic'
+                });
+            }
+        });
+    });
 
     container.querySelectorAll('.comic-art-zoom-btn').forEach((btn) => {
         btn.addEventListener('click', () => {

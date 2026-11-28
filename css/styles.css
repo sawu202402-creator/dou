@@ -948,6 +948,31 @@ rt.py-rt {
     box-shadow: 0 2px 0 #DA5879;
 }
 
+.btn-edit-page {
+    min-height: 40px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: var(--purple-soft);
+    border: 2px solid #C2B0F5;
+    color: var(--purple-moon);
+    font-size: 0.86rem;
+    font-weight: 800;
+    box-shadow: 0 3px 0 #D5C8FA;
+    white-space: nowrap;
+}
+
+.btn-edit-page:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 #D5C8FA;
+}
+
+.btn-edit-page-sm {
+    min-height: 34px;
+    padding: 4px 11px;
+    font-size: 0.78rem;
+    margin-left: auto;
+}
+
 .storybook-tip {
     font-size: 0.78rem;
     font-weight: 700;
@@ -1049,6 +1074,37 @@ rt.py-rt {
     background: #FFF7E9;
     border: 2.5px solid #4A3528;
     box-shadow: 0 5px 0 rgba(74, 53, 40, 0.14);
+}
+
+.comic-panel-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 5px;
+    padding: 0 2px;
+}
+
+.comic-panel-label {
+    font-size: 0.72rem;
+    font-weight: 900;
+    color: var(--ink-soft);
+}
+
+.btn-edit-panel {
+    min-height: 26px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: #EFEAFF;
+    border: 1.5px solid #B7A4F4;
+    color: var(--purple-moon);
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.btn-edit-panel:active {
+    transform: scale(0.97);
 }
 
 .comic-art-box {

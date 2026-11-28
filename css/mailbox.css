@@ -201,14 +201,140 @@
     transform: translateX(20px);
 }
 
+/* ==================== 指哪改哪选书与目标锚点栏 ==================== */
+.sm-target-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #FFF9F0;
+    border-bottom: 1.5px solid #EBD7C0;
+}
+
+.sm-book-picker {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    scrollbar-width: none;
+}
+
+.sm-book-picker::-webkit-scrollbar,
+.sm-target-pills-row::-webkit-scrollbar,
+.sm-char-chips-row::-webkit-scrollbar {
+    display: none;
+}
+
+.sm-book-pick-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #FFFFFF;
+    border: 1.5px solid #E4CEB0;
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sm-book-pick-btn.is-active {
+    background: var(--purple-moon);
+    border-color: var(--purple-moon);
+    color: #FFFFFF;
+}
+
+.sm-book-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    flex-shrink: 0;
+}
+
+.sm-target-card {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 9px;
+    border-radius: 14px;
+    background: #FFFFFF;
+    border: 1.5px solid #DFC6EE;
+}
+
+.sm-target-thumb {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1.5px solid #E7D5BC;
+    flex-shrink: 0;
+}
+
+.sm-target-body {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sm-target-summary {
+    font-size: 0.78rem;
+    font-weight: 900;
+    color: var(--purple-moon);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sm-target-pills-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    gap: 4px;
+    scrollbar-width: none;
+}
+
+.sm-mini-sep {
+    color: #CBB69D;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0 2px;
+}
+
+.sm-mini-pill {
+    min-height: 24px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #F7EFE4;
+    border: 1px solid #DFCAB0;
+    font-size: 0.71rem;
+    font-weight: 800;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sm-mini-pill.is-active {
+    background: #FFE5F0;
+    border-color: #FF7CA6;
+    color: #A82252;
+}
+
 .sm-stream {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 14px;
+    padding: 12px 14px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    min-height: 180px;
+    gap: 11px;
+    min-height: 130px;
 }
 
 .sm-row {
@@ -510,6 +636,78 @@
 
 .sm-wake-btn:active {
     transform: translateY(1px);
+}
+
+.sm-char-chips-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    gap: 6px;
+    scrollbar-width: none;
+}
+
+.sm-char-label {
+    font-size: 0.74rem;
+    font-weight: 900;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sm-char-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 28px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #F4EEFF;
+    border: 1.5px solid #D3C3F5;
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: #4D3B8E;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sm-char-chip.is-active {
+    background: #5C4B99;
+    border-color: #5C4B99;
+    color: #FFFFFF;
+}
+
+.sm-dispatch-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 11px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #E9FBF7 0%, #EFF6FF 100%);
+    border: 1.5px solid #84DFD2;
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: #136B61;
+}
+
+.sm-dispatch-btn {
+    min-height: 30px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #FF7CA6, #FF9966);
+    color: #FFFFFF;
+    font-size: 0.76rem;
+    font-weight: 900;
+    box-shadow: 0 2px 0 #D85879;
+    white-space: nowrap;
+}
+
+.sm-dispatch-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+    box-shadow: none;
 }
 
 .sm-status-hint {

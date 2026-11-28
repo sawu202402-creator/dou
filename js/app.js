@@ -148,6 +148,8 @@ const storyMailbox = new StoryMailboxController({
             whisperHints
         };
     },
+    getBooks: () => state.manifestBooks || [],
+    loadBook: (bookId) => fetchBook(bookId),
     onBeforeOpen: () => stopAutoplay(),
     onJumpToBook: (bookId, pageNum) => openBook(bookId, pageNum, null, { flashMagic: true }),
     onNewReply: (reply) => {
@@ -614,7 +616,11 @@ function renderCurrentView({ flashMagic = false } = {}) {
             totalPages: pages.length,
             speakingKey: state.speakingKey,
             onSpeakParagraph: (para, _idx, key) => speakSingle(para.text, 'narrator', key),
-            onSpeakPage: () => speakCurrentStorybookPageOnce()
+            onSpeakPage: () => speakCurrentStorybookPageOnce(),
+            onEditPage: (target) => {
+                audioEngine.unlockInGesture();
+                storyMailbox.open(target);
+            }
         });
     } else {
         renderComicPage(mainStageEl, book, page, {
@@ -622,7 +628,11 @@ function renderCurrentView({ flashMagic = false } = {}) {
             totalPages: pages.length,
             speakingKey: state.speakingKey,
             onSpeakItem: ({ text, role, speakKey }) => speakSingle(text, role, speakKey),
-            onZoomImage: (info) => openArtLightbox(info)
+            onZoomImage: (info) => openArtLightbox(info),
+            onEditTarget: (target) => {
+                audioEngine.unlockInGesture();
+                storyMailbox.open(target);
+            }
         });
     }
 

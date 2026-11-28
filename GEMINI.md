@@ -150,7 +150,7 @@
    （首次使用需绑定线上域名：`node scripts/mailbox_cli.mjs set-url https://<你的线上域名>`）
 2. **零 Token 本地哨兵联动（`scripts/watch_mailbox.mjs`）**：
    - 平时挂起 `node scripts/watch_mailbox.mjs`（后台非守护进程模式 `IsDaemon: false`，不设 `NotificationTimeoutSeconds`），全程 **0 AI Token 消耗**；
-   - 当检测到网页端开启巡检开关且有 `pending` 留言时，哨兵会自动退出并唤醒你执行第 2 节全部 5 步创作流程；
+   - 留言可能包含精准的 `target` 定位锚点（书目、页码、分镜格 `panelNumber`、选中角色 `characterName`、修改意图 `actionType`），多轮聊完后哨兵会在静默 40 秒（或小豌豆点击「🎨 说好啦，立刻开工」）时自动退出并唤醒你执行第 2 节全部 5 步创作流程；
    - 完成创作、推送并发送正式回信后，自动重新启动 `node /home/better/IdeaProjects/dou/scripts/watch_mailbox.mjs` 回到零 Token 静默待命状态。
 3. **按需执行创作与静默/播报区分**：
    - 若来源是小豌豆在网页「🪄 聊故事」发来的留言：完整执行第 2 节 5 步流水线，更新 `version.json`（不设 `silent: true`，带 `announcement` 触发语音播报），并调用 `mailbox_cli.mjs reply` 发送正式回信。

@@ -114,6 +114,18 @@ async function cmdPull(args) {
         const tag = w.status === 'fulfilled' ? '✅[已画完]' : (w.status === 'read' ? '👀[已读]' : '🌟[新点子]');
         const loc = w.bookTitle ? `《${w.bookTitle}》第${w.pageNumber || 1}页 (${w.mode})` : '魔法书架';
         console.log(`${tag} [${w.createdStr}] ${w.kidName || '小豌豆'} @ ${loc} [ID: ${w.id}]`);
+        if (w.target && typeof w.target === 'object') {
+            const tParts = [
+                w.target.scope ? `范围=${w.target.scope}` : '',
+                w.target.panelNumber > 0 ? `第${w.target.panelNumber}格` : '',
+                w.target.characterName ? `角色=${w.target.characterEmoji || ''}${w.target.characterName}` : '',
+                w.target.actionType ? `意图=${w.target.actionType}` : '',
+                w.target.snippet ? `原文=“${w.target.snippet}”` : ''
+            ].filter(Boolean);
+            if (tParts.length > 0) {
+                console.log(`   🎯 定位：${tParts.join(' · ')}`);
+            }
+        }
         console.log(`   💬 小豌豆说：“${w.text}”`);
         if (w.instantReplyText) {
             console.log(`   🧠 实时陪聊：“${w.instantReplyText}”`);
