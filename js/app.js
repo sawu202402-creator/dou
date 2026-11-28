@@ -169,28 +169,34 @@ const storyMailbox = new StoryMailboxController({
 
 const voiceStudio = new VoiceStudioController({
     audioEngine,
+    getBooks: () => state.manifestBooks || [],
+    loadBook: (bookId) => fetchBook(bookId),
+    getCurrentBook: () => state.currentBook,
     onBeforeOpen: () => stopAutoplay(),
     onProfileChange: () => {
         syncVoiceStudioBadge();
         if (state.view === 'shelf' && state.manifestBooks.length > 0) {
+            renderCurrentView();
+        } else if (state.view === 'reader' && state.mode === 'comic' && state.currentBook) {
             renderCurrentView();
         }
     }
 });
 
 function syncVoiceStudioBadge() {
-    const p = voiceStudio.getProfile() || {};
+    const sum = voiceStudio.getSummary?.() || {};
     if (voiceStudioDot) {
-        voiceStudioDot.classList.toggle('is-ready', Boolean(p.cloneReady));
-        voiceStudioDot.classList.toggle('is-pending', Boolean((p.hasSample || p.overrideVoiceConfigured) && !p.cloneReady));
+        voiceStudioDot.classList.toggle('is-ready', Boolean(sum.anyReady));
+        voiceStudioDot.classList.toggle('is-pending', Boolean(sum.sampleCount > 0 && !sum.anyReady));
     }
     if (btnOpenVoiceStudio) {
-        if (p.cloneReady) {
-            btnOpenVoiceStudio.title = `小豌豆专属声线生效中（${p.providerLabel || p.provider}），点击管理或重新录制`;
-        } else if (p.hasSample) {
-            btnOpenVoiceStudio.title = '小豌豆真实原声已存入云端，点击试听或配置 AI 克隆密钥';
+        if (sum.activeCount > 0) {
+            const names = (sum.activeNames || []).join('、');
+            btnOpenVoiceStudio.title = `已有 ${sum.activeCount} 个专属声线生效中（${names}），点击录新朋友或管理`;
+        } else if (sum.sampleCount > 0) {
+            btnOpenVoiceStudio.title = '已有真实原声存入云端，点击试听或配置 AI 克隆密钥';
         } else {
-            btnOpenVoiceStudio.title = '录一段小豌豆真实声音，让所有故事书里的我都变成你的声线！';
+            btnOpenVoiceStudio.title = '录一段小豌豆和好朋友们的真实声音，让所有故事书里的角色都能用真人声线！';
         }
     }
 }
@@ -458,20 +464,23 @@ function prefetchCurrentPage() {
     if (!book || !page || audioEngine.muted) return;
 
     const queue = [];
+    const narratorProfileId = voiceStudio.resolveVoiceProfileId('narrator', '故事姐姐');
     if (state.mode === 'storybook') {
         for (const p of (page.storyParagraphs || []).slice(0, 2)) {
-            if (p?.text) queue.push({ text: p.text, role: 'narrator' });
+            if (p?.text) queue.push({ text: p.text, role: 'narrator', voiceProfileId: narratorProfileId });
         }
     } else {
         const characters = book.characters || {};
         for (const panel of (page.panels || [])) {
             if (panel.caption && queue.length < 3) {
-                queue.push({ text: panel.caption, role: 'narrator' });
+                queue.push({ text: panel.caption, role: 'narrator', voiceProfileId: narratorProfileId });
             }
             for (const b of (panel.bubbles || [])) {
                 if (queue.length >= 3) break;
-                const role = characters[b.characterId]?.voiceRole || 'narrator';
-                if (b?.text) queue.push({ text: b.text, role });
+                const ch = characters[b.characterId];
+                const role = ch?.voiceRole || 'narrator';
+                const voiceProfileId = voiceStudio.resolveVoiceProfileId(b.characterId, ch?.name);
+                if (b?.text) queue.push({ text: b.text, role, voiceProfileId });
             }
             if (queue.length >= 3) break;
         }
@@ -483,16 +492,17 @@ function prefetchCurrentPage() {
     ttsPrefetchTimer = setTimeout(async () => {
         for (const item of queue) {
             if (myRunId !== ttsPrefetchRunId || audioEngine.muted) break;
-            await audioEngine.prefetch(item.text, item.role);
+            await audioEngine.prefetch(item.text, item.role, item.voiceProfileId);
         }
     }, 500);
 }
 
-async function speakSingle(text, role, speakKey) {
+async function speakSingle(text, role, speakKey, voiceProfileId = '') {
     audioEngine.unlockInGesture();
     stopAutoplay();
     setSpeakingHighlight(speakKey);
     await audioEngine.speak(text, role, {
+        voiceProfileId,
         onEnd: () => {
             if (state.speakingKey === speakKey) {
                 setSpeakingHighlight('');
@@ -504,15 +514,17 @@ async function speakSingle(text, role, speakKey) {
 function getPageSpeechQueue(book, page) {
     const items = [];
     if (!book || !page) return items;
+    const narratorProfileId = voiceStudio.resolveVoiceProfileId('narrator', '故事姐姐');
 
     if (state.mode === 'storybook') {
         if (page.title) {
-            items.push({ text: `第${page.pageNumber}页，${page.title}`, role: 'narrator', speakKey: '' });
+            items.push({ text: `第${page.pageNumber}页，${page.title}`, role: 'narrator', voiceProfileId: narratorProfileId, speakKey: '' });
         }
         (page.storyParagraphs || []).forEach((p, idx) => {
             items.push({
                 text: p.text,
                 role: 'narrator',
+                voiceProfileId: narratorProfileId,
                 speakKey: buildStorySpeakKey(book.id, page.pageNumber, idx)
             });
         });
@@ -523,14 +535,18 @@ function getPageSpeechQueue(book, page) {
                 items.push({
                     text: panel.caption,
                     role: 'narrator',
+                    voiceProfileId: narratorProfileId,
                     speakKey: buildComicCaptionSpeakKey(book.id, page.pageNumber, pIdx)
                 });
             }
             (panel.bubbles || []).forEach((b, bIdx) => {
-                const role = characters[b.characterId]?.voiceRole || 'narrator';
+                const ch = characters[b.characterId];
+                const role = ch?.voiceRole || 'narrator';
+                const voiceProfileId = voiceStudio.resolveVoiceProfileId(b.characterId, ch?.name);
                 items.push({
                     text: b.text,
                     role,
+                    voiceProfileId,
                     speakKey: buildComicBubbleSpeakKey(book.id, page.pageNumber, pIdx, bIdx)
                 });
             });
@@ -551,7 +567,7 @@ async function speakCurrentStorybookPageOnce() {
     for (const item of items) {
         if (state.autoplayRunId !== myRunId || audioEngine.muted) break;
         setSpeakingHighlight(item.speakKey);
-        const res = await audioEngine.speak(item.text, item.role);
+        const res = await audioEngine.speak(item.text, item.role, { voiceProfileId: item.voiceProfileId });
         if (res.cancelled || state.autoplayRunId !== myRunId) break;
     }
     if (state.autoplayRunId === myRunId) {
@@ -581,7 +597,7 @@ async function startFullBookAutoplay() {
             const item = queue[i];
             const nextItem = queue[i + 1];
             if (nextItem) {
-                audioEngine.prefetch(nextItem.text, nextItem.role);
+                audioEngine.prefetch(nextItem.text, nextItem.role, nextItem.voiceProfileId);
             }
             setSpeakingHighlight(item.speakKey);
             const activeEl = item.speakKey
@@ -590,7 +606,7 @@ async function startFullBookAutoplay() {
             if (activeEl && typeof activeEl.scrollIntoView === 'function') {
                 activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
-            const res = await audioEngine.speak(item.text, item.role);
+            const res = await audioEngine.speak(item.text, item.role, { voiceProfileId: item.voiceProfileId });
             if (res.cancelled || !state.autoplaying || state.autoplayRunId !== myRunId) break;
         }
 
@@ -623,7 +639,8 @@ function renderCurrentView({ flashMagic = false } = {}) {
             latestBookId: state.updatedBookId,
             updatedJustNow: Boolean(state.updatedBookId),
             readingProgress: state.readingProgress,
-            voiceProfile: voiceStudio.getProfile(),
+            voiceProfile: voiceStudio.getProfile('pea'),
+            voiceSummary: voiceStudio.getSummary(),
             onOpenBook: (bookId) => {
                 audioEngine.unlockInGesture();
                 openBook(bookId, null, null, { resumeProgress: true });
@@ -658,15 +675,19 @@ function renderCurrentView({ flashMagic = false } = {}) {
     if (state.pageIndex >= pages.length) state.pageIndex = pages.length - 1;
     const page = pages[state.pageIndex];
 
+    const narratorProfileId = voiceStudio.resolveVoiceProfileId('narrator', '故事姐姐');
     if (state.mode === 'storybook' || !bookHasComicPanels(book)) {
         const rendererFn = book.bookType === 'notebook' ? renderNotebookPage : renderStorybookPage;
         rendererFn(mainStageEl, book, page, {
             pageIndex: state.pageIndex,
             totalPages: pages.length,
             speakingKey: state.speakingKey,
-            onSpeakParagraph: (para, _idx, key) => speakSingle(para.text, 'narrator', key),
+            onSpeakParagraph: (para, _idx, key) => speakSingle(para.text, 'narrator', key, narratorProfileId),
             onSpeakPage: () => speakCurrentStorybookPageOnce(),
-            onSpeakCustom: ({ text, role, speakKey }) => speakSingle(text, role || 'narrator', speakKey),
+            onSpeakCustom: ({ text, role, speakKey }) => {
+                const profId = (!role || role === 'narrator') ? narratorProfileId : voiceStudio.resolveVoiceProfileId(role);
+                speakSingle(text, role || 'narrator', speakKey, profId);
+            },
             onZoomImage: (info) => openArtLightbox(info),
             onEditPage: (target) => {
                 audioEngine.unlockInGesture();
@@ -678,11 +699,19 @@ function renderCurrentView({ flashMagic = false } = {}) {
             pageIndex: state.pageIndex,
             totalPages: pages.length,
             speakingKey: state.speakingKey,
-            onSpeakItem: ({ text, role, speakKey }) => speakSingle(text, role, speakKey),
+            isCharacterCloned: (cid, cName) => voiceStudio.isCharacterCloned(cid, cName),
+            onSpeakItem: ({ text, role, characterId, characterName, speakKey }) => {
+                const voiceProfileId = voiceStudio.resolveVoiceProfileId(characterId, characterName);
+                speakSingle(text, role, speakKey, voiceProfileId);
+            },
             onZoomImage: (info) => openArtLightbox(info),
             onEditTarget: (target) => {
                 audioEngine.unlockInGesture();
                 storyMailbox.open(target);
+            },
+            onOpenVoiceForCharacter: (charInfo) => {
+                audioEngine.unlockInGesture();
+                voiceStudio.open(charInfo);
             }
         });
     }
@@ -719,6 +748,8 @@ async function openBook(bookId, pageNum = 1, modeOverride = null, { flashMagic =
             state.mode = 'storybook';
         } else if (modeOverride) {
             state.mode = modeOverride;
+        } else if (book.bookType === 'notebook') {
+            state.mode = (resumeProgress ? prog?.mode : '') || 'storybook';
         } else {
             const manifestItem = state.manifestBooks.find((b) => b.id === bookId);
             state.mode = (resumeProgress ? prog?.mode : '') || state.preferredMode || manifestItem?.defaultMode || 'storybook';

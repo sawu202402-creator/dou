@@ -87,6 +87,8 @@ export class StoryAudioEngine {
         this._inflightTtsMap = new Map();
         this._cacheEpoch = 0;
         this._voiceSig = 'default';
+        this._voiceSigMap = new Map();
+        this._voiceProfilesLoaded = false;
         this._cloudTtsUnavailable = false;
         this._pendingGesturePlay = null;
         this._currentSpeakText = '';
@@ -233,18 +235,66 @@ export class StoryAudioEngine {
 
     setVoiceSignature(sig = 'default') {
         const nextSig = String(sig || 'default').trim() || 'default';
-        if (nextSig === this._voiceSig) return;
-        this._voiceSig = nextSig;
-        for (const key of Array.from(this._ttsMemCache.keys())) {
-            if (key.startsWith('pea')) this._ttsMemCache.delete(key);
+        const nextObj = {};
+        for (const [k, v] of this._voiceSigMap.entries()) {
+            if (k !== 'pea' && v && v !== 'default') nextObj[k] = v;
         }
-        for (const key of Array.from(this._inflightTtsMap.keys())) {
-            if (key.startsWith('pea')) this._inflightTtsMap.delete(key);
+        if (nextSig !== 'default') nextObj.pea = nextSig;
+        this.setVoiceSignatures(nextObj, { loaded: this._voiceProfilesLoaded });
+    }
+
+    setVoiceSignatures(sigObj = {}, { loaded = true } = {}) {
+        if (loaded) this._voiceProfilesLoaded = true;
+        const nextMap = new Map();
+        if (sigObj && typeof sigObj === 'object') {
+            for (const [rawId, rawSig] of Object.entries(sigObj)) {
+                const speakerId = String(rawId || '').trim();
+                const sig = String(rawSig || '').trim();
+                if (speakerId && sig && sig !== 'default') {
+                    nextMap.set(speakerId, sig);
+                }
+            }
+        }
+
+        const changedIds = new Set();
+        for (const [k, v] of this._voiceSigMap.entries()) {
+            if (nextMap.get(k) !== v) changedIds.add(k);
+        }
+        for (const [k, v] of nextMap.entries()) {
+            if (this._voiceSigMap.get(k) !== v) changedIds.add(k);
+        }
+
+        this._voiceSigMap = nextMap;
+        this._voiceSig = nextMap.get('pea') || 'default';
+
+        if (changedIds.size > 0) {
+            const evict = (map) => {
+                for (const key of Array.from(map.keys())) {
+                    for (const cid of changedIds) {
+                        if (key.startsWith(`cloned[${cid}@`) || (cid === 'pea' && key.startsWith('pea['))) {
+                            map.delete(key);
+                            break;
+                        }
+                    }
+                }
+            };
+            evict(this._ttsMemCache);
+            evict(this._inflightTtsMap);
         }
     }
 
-    _buildCacheKey(role = 'narrator', cleanText = '') {
-        return role === 'pea' ? `pea[${this._voiceSig}]::${cleanText}` : `${role}::${cleanText}`;
+    _resolveSpeakerSig(role = 'narrator', voiceProfileId = '') {
+        const speakerId = String(voiceProfileId || (role === 'pea' ? 'pea' : '')).trim();
+        const sig = speakerId ? (this._voiceSigMap.get(speakerId) || 'default') : 'default';
+        return { speakerId, sig };
+    }
+
+    _buildCacheKey(role = 'narrator', cleanText = '', voiceProfileId = '') {
+        const { speakerId, sig } = this._resolveSpeakerSig(role, voiceProfileId);
+        if (sig !== 'default') {
+            return `cloned[${speakerId}@${sig}]::${cleanText}`;
+        }
+        return role === 'pea' ? `pea[default]::${cleanText}` : `${role}::${cleanText}`;
     }
 
     async clearCache() {
@@ -356,9 +406,10 @@ export class StoryAudioEngine {
         this._notify();
     }
 
-    async _fetchNeuralTtsBase64(cleanText, role = 'narrator') {
+    async _fetchNeuralTtsBase64(cleanText, role = 'narrator', voiceProfileId = '') {
         if (!cleanText || !this._shouldUseCloudTts()) return '';
-        const cacheKey = this._buildCacheKey(role, cleanText);
+        const { speakerId, sig } = this._resolveSpeakerSig(role, voiceProfileId);
+        const cacheKey = this._buildCacheKey(role, cleanText, speakerId);
         if (this._ttsMemCache.has(cacheKey)) {
             return this._ttsMemCache.get(cacheKey);
         }
@@ -366,6 +417,10 @@ export class StoryAudioEngine {
             return this._inflightTtsMap.get(cacheKey);
         }
 
+        const sendProfileId = Boolean(
+            speakerId && (sig !== 'default' || speakerId === 'pea' || !this._voiceProfilesLoaded)
+        );
+        const timeoutMs = sig !== 'default' ? 15000 : 7000;
         const reqEpoch = this._cacheEpoch;
         const reqPromise = (async () => {
             const diskHit = await this._readDiskCache(cacheKey);
@@ -377,12 +432,14 @@ export class StoryAudioEngine {
             }
 
             const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-            const timeoutId = ctrl ? setTimeout(() => ctrl.abort(), 7000) : null;
+            const timeoutId = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
             try {
+                const payload = { text: cleanText, role };
+                if (sendProfileId) payload.voiceProfileId = speakerId;
                 const res = await fetch('/api/tts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: cleanText, role }),
+                    body: JSON.stringify(payload),
                     signal: ctrl ? ctrl.signal : undefined
                 });
                 if (res.status === 404 || res.status === 405 || res.status === 501) {
@@ -414,11 +471,11 @@ export class StoryAudioEngine {
         }
     }
 
-    prefetch(text, role = 'narrator') {
+    prefetch(text, role = 'narrator', voiceProfileId = '') {
         if (this.muted || !text || !this._shouldUseCloudTts()) return Promise.resolve('');
         const cleanText = cleanTextForTts(text);
         if (!cleanText) return Promise.resolve('');
-        return this._fetchNeuralTtsBase64(cleanText, role).catch(() => '');
+        return this._fetchNeuralTtsBase64(cleanText, role, voiceProfileId).catch(() => '');
     }
 
     async _playBase64AndAwaitEnd(b64, token) {
@@ -568,14 +625,16 @@ export class StoryAudioEngine {
         if (!cleanText || this.muted) {
             return { ok: false, mode: 'idle', cancelled: false };
         }
-        if (this.isSpeaking && this._currentSpeakText === cleanText && (Date.now() - this._currentSpeakAt) < 800) {
+        const voiceProfileId = String(callbacks?.voiceProfileId || callbacks?.speakerId || '').trim();
+        const dedupeKey = `${voiceProfileId || role}::${cleanText}`;
+        if (this.isSpeaking && this._currentSpeakText === dedupeKey && (Date.now() - this._currentSpeakAt) < 800) {
             return { ok: true, mode: this.lastPlaybackMode || 'idle', cancelled: false, deduped: true };
         }
 
         this.stop();
         const token = ++this._speakToken;
         this.isSpeaking = true;
-        this._currentSpeakText = cleanText;
+        this._currentSpeakText = dedupeKey;
         this._currentSpeakAt = Date.now();
         this.lastPlaybackMode = 'idle';
         this._pendingGesturePlay = null;
@@ -606,7 +665,7 @@ export class StoryAudioEngine {
 
         (async () => {
             try {
-                const b64 = await this._fetchNeuralTtsBase64(cleanText, role);
+                const b64 = await this._fetchNeuralTtsBase64(cleanText, role, voiceProfileId);
                 if (token !== this._speakToken || this.muted) {
                     finalize({ ok: true, mode: this.lastPlaybackMode, cancelled: true });
                     return;
@@ -627,7 +686,12 @@ export class StoryAudioEngine {
 
                 const localRes = await this._playLocalSpeechAndAwaitEnd(cleanText, role, token);
                 if (token === this._speakToken && !this.muted && !localRes.played && cloudRes?.reason === 'autoplay_blocked') {
-                    this._pendingGesturePlay = { text: cleanText, role, callbacks: {}, expiresAt: Date.now() + 10000 };
+                    this._pendingGesturePlay = {
+                        text: cleanText,
+                        role,
+                        callbacks: voiceProfileId ? { voiceProfileId } : {},
+                        expiresAt: Date.now() + 10000
+                    };
                 }
                 finalize({
                     ok: Boolean(localRes.played),
@@ -651,7 +715,8 @@ export class StoryAudioEngine {
         if (this.muted) {
             return { ok: false, mode: 'idle', cancelled: false };
         }
-        const dedupeKey = cleanFallback || cleanB64.slice(0, 64);
+        const voiceProfileId = String(callbacks?.voiceProfileId || callbacks?.speakerId || '').trim();
+        const dedupeKey = cleanFallback ? `${voiceProfileId || role}::${cleanFallback}` : cleanB64.slice(0, 64);
         if (dedupeKey && this.isSpeaking && this._currentSpeakText === dedupeKey && (Date.now() - this._currentSpeakAt) < 800) {
             return { ok: true, mode: this.lastPlaybackMode || 'idle', cancelled: false, deduped: true };
         }
@@ -660,7 +725,7 @@ export class StoryAudioEngine {
         }
 
         if (cleanFallback) {
-            const cacheKey = this._buildCacheKey(role, cleanFallback);
+            const cacheKey = this._buildCacheKey(role, cleanFallback, voiceProfileId);
             this._saveToMemCache(cacheKey, cleanB64);
             this._writeDiskCache(cacheKey, cleanB64).catch(() => {});
         }

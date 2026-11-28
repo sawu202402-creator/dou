@@ -480,6 +480,168 @@
     font-weight: 700;
 }
 
+.vs-char-picker {
+    padding: 11px 13px;
+    border-radius: 18px;
+    background: #FFFFFF;
+    border: 2px solid #E5D4BD;
+    box-shadow: 0 3px 10px rgba(74, 53, 40, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vs-char-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.vs-char-head-title {
+    font-size: 0.86rem;
+    font-weight: 900;
+    color: var(--ink-brown);
+}
+
+.vs-char-count {
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: #E6FBF7;
+    border: 1px solid #8CE2D6;
+    color: #0F6C62;
+}
+
+.vs-char-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.vs-char-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 34px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #FFF9EE;
+    border: 1.5px solid #DFC49C;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--ink-brown);
+    transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+
+.vs-char-chip:active {
+    transform: scale(0.97);
+}
+
+.vs-char-chip.is-active {
+    background: #5C4B99;
+    border-color: #5C4B99;
+    color: #FFFFFF;
+    box-shadow: 0 3px 0 #403274;
+}
+
+.vs-char-chip-more {
+    background: #F4EFE6;
+    border-style: dashed;
+    color: var(--ink-soft);
+}
+
+.vs-char-chip-add {
+    background: #FFF0F6;
+    border-color: #F4A5C0;
+    color: #B43767;
+}
+
+.vs-char-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: transparent;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.vs-char-dot.is-ready {
+    background: #20C997;
+    box-shadow: 0 0 0 2px rgba(32, 201, 151, 0.25);
+}
+
+.vs-char-chip.is-active .vs-char-dot.is-ready {
+    background: #7DF5CF;
+}
+
+.vs-char-dot.is-saved {
+    background: #F59F00;
+}
+
+.vs-add-friend-bar {
+    padding: 10px 11px;
+    border-radius: 14px;
+    background: #FFF8FB;
+    border: 1.5px dashed #F1ABC4;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vs-emoji-picks {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.vs-emoji-pick-label {
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: var(--ink-soft);
+}
+
+.vs-emoji-pick {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1.5px solid #E5D4BD;
+    background: #FFFFFF;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vs-emoji-pick.is-active {
+    border-color: #FF5D8F;
+    background: #FFEAF1;
+    box-shadow: 0 0 0 2px rgba(255, 93, 143, 0.22);
+}
+
+.vs-friend-input-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+}
+
+.vs-friend-input {
+    flex: 1 1 160px;
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1.5px solid #DFC49C;
+    background: #FFFFFF;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--ink-brown);
+}
+
 @media (max-width: 640px) {
     .vs-modal {
         width: 100%;

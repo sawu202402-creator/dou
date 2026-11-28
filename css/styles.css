@@ -1084,6 +1084,42 @@ rt.py-rt {
     font-weight: 800;
 }
 
+.cast-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--ink-brown);
+    transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.cast-pill-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(74, 53, 40, 0.12);
+}
+
+.cast-pill-btn:active {
+    transform: scale(0.97);
+}
+
+.cast-pill-btn.is-cloned {
+    border-color: #20C997;
+    box-shadow: 0 0 0 2px rgba(32, 201, 151, 0.18);
+}
+
+.cast-mic-tag {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.85);
+    color: var(--ink-soft);
+}
+
+.cast-pill-btn.is-cloned .cast-mic-tag {
+    background: #E6FBF7;
+    color: #0E7065;
+}
+
 .comic-tap-tip {
     font-size: 0.8rem;
     font-weight: 700;
@@ -1326,6 +1362,23 @@ rt.py-rt {
     font-size: 0.76rem;
     font-weight: 800;
     color: var(--ink-brown);
+}
+
+.bubble-voice-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.bubble-cloned-tag {
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #E6FBF7;
+    border: 1px solid #75DACD;
+    color: #0E7065;
+    font-size: 0.68rem;
+    font-weight: 800;
 }
 
 .bubble-voice-icon {

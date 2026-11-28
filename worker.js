@@ -49,12 +49,16 @@ function sanitizeVoiceRole(raw) {
 }
 
 async function runClonedTtsWithEnroll({ vcCfg, cleanText, profile, syncFn }) {
-    let providerVoiceId = vcCfg.overrideVoiceId || (profile.provider === vcCfg.provider ? cleanStr(profile.providerVoiceId, 260) : "");
+    const roleId = sanitizeVoiceRole(profile?.role || "pea");
+    const effectiveOverride = roleId === "pea" ? vcCfg.overrideVoiceId : "";
+    const cfgForRole = { ...vcCfg, overrideVoiceId: effectiveOverride };
+    let providerVoiceId = effectiveOverride || (profile.provider === vcCfg.provider ? cleanStr(profile.providerVoiceId, 260) : "");
     if (!providerVoiceId) {
         if (!profile.hasSample) {
             throw new VoiceNotFoundError("missing_voice_sample");
         }
-        providerVoiceId = await enrollClonedVoice(vcCfg, {
+        providerVoiceId = await enrollClonedVoice(cfgForRole, {
+            role: roleId,
             sampleAudioB64: profile.sampleAudioB64,
             sampleMime: profile.sampleMime,
             sampleText: profile.sampleText,
@@ -69,16 +73,18 @@ async function runClonedTtsWithEnroll({ vcCfg, cleanText, profile, syncFn }) {
     }
 
     try {
-        const res = await synthesizeClonedSpeech(vcCfg, {
+        const res = await synthesizeClonedSpeech(cfgForRole, {
             text: cleanText,
+            role: roleId,
             providerVoiceId,
             sampleAudioB64: profile.sampleAudioB64,
             sampleText: profile.sampleText
         });
         return { audioBase64: res.audioBase64, providerVoiceId };
     } catch (err) {
-        if (err instanceof VoiceNotFoundError && !vcCfg.overrideVoiceId && profile.hasSample) {
-            const refreshedId = await enrollClonedVoice(vcCfg, {
+        if (err instanceof VoiceNotFoundError && !effectiveOverride && profile.hasSample) {
+            const refreshedId = await enrollClonedVoice(cfgForRole, {
+                role: roleId,
                 sampleAudioB64: profile.sampleAudioB64,
                 sampleMime: profile.sampleMime,
                 sampleText: profile.sampleText,
@@ -90,8 +96,9 @@ async function runClonedTtsWithEnroll({ vcCfg, cleanText, profile, syncFn }) {
                 syncedAt: Date.now(),
                 lastError: ""
             });
-            const retryRes = await synthesizeClonedSpeech(vcCfg, {
+            const retryRes = await synthesizeClonedSpeech(cfgForRole, {
                 text: cleanText,
+                role: roleId,
                 providerVoiceId: refreshedId,
                 sampleAudioB64: profile.sampleAudioB64,
                 sampleText: profile.sampleText
@@ -468,21 +475,40 @@ export class StoryMailboxDO extends DurableObject {
                     updated_str TEXT NOT NULL
                 );
             `);
-            try {
-                this.ctx.storage.sql.exec(`ALTER TABLE story_wishes ADD COLUMN target_json TEXT DEFAULT ''`);
-            } catch (_) {}
+            for (const ddl of [
+                `ALTER TABLE story_wishes ADD COLUMN target_json TEXT DEFAULT ''`,
+                `ALTER TABLE voice_profiles ADD COLUMN display_name TEXT DEFAULT ''`,
+                `ALTER TABLE voice_profiles ADD COLUMN emoji TEXT DEFAULT ''`,
+                `ALTER TABLE voice_profiles ADD COLUMN fallback_role TEXT DEFAULT ''`
+            ]) {
+                try {
+                    this.ctx.storage.sql.exec(ddl);
+                } catch (_) {}
+            }
         });
     }
 
     _getVoiceProfileRow(role = "pea") {
         const cleanRole = sanitizeVoiceRole(role);
         const rows = this.ctx.storage.sql.exec(
-            `SELECT role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version,
+            `SELECT role, display_name, emoji, fallback_role,
+                    sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version,
                     provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str
              FROM voice_profiles WHERE role = ? LIMIT 1`,
             cleanRole
         ).toArray();
         return rows[0] || null;
+    }
+
+    _listVoiceProfileMetaRows() {
+        return this.ctx.storage.sql.exec(
+            `SELECT role, display_name, emoji, fallback_role,
+                    (LENGTH(sample_audio_b64) > 32) AS has_sample,
+                    sample_mime, sample_text, duration_ms, enabled, version,
+                    provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str
+             FROM voice_profiles
+             ORDER BY CASE WHEN role = 'pea' THEN 0 ELSE 1 END, updated_at DESC`
+        ).toArray();
     }
 
     _getEffectiveVoiceCloneConfig() {
@@ -499,17 +525,23 @@ export class StoryMailboxDO extends DurableObject {
     _formatPublicVoiceProfile(row, role = "pea") {
         const cleanRole = sanitizeVoiceRole(role);
         const vc = this._getEffectiveVoiceCloneConfig();
-        const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
-        const enabled = row ? Number(row.enabled) !== 0 : Boolean(vc.overrideVoiceId);
+        const effectiveOverride = cleanRole === "pea" ? vc.overrideVoiceId : "";
+        const hasSample = row?.has_sample !== undefined
+            ? Boolean(Number(row.has_sample))
+            : Boolean(row && cleanStr(row.sample_audio_b64, 32));
+        const enabled = row ? Number(row.enabled) !== 0 : Boolean(effectiveOverride);
         const providerVoiceSynced = Boolean(
             vc.configured &&
-            (vc.overrideVoiceId || (hasSample && row?.provider === vc.provider && cleanStr(row?.provider_voice_id, 260)))
+            (effectiveOverride || (hasSample && row?.provider === vc.provider && cleanStr(row?.provider_voice_id, 260)))
         );
-        const cloneReady = Boolean(vc.configured && enabled && (hasSample || vc.overrideVoiceId));
+        const cloneReady = Boolean(vc.configured && enabled && (hasSample || effectiveOverride));
         return {
             role: cleanRole,
+            displayName: cleanStr(row?.display_name, 32) || (cleanRole === "pea" ? "小豌豆" : ""),
+            emoji: cleanStr(row?.emoji, 16) || (cleanRole === "pea" ? "🐰" : ""),
+            fallbackRole: cleanStr(row?.fallback_role, 32) || (ROLE_NEURAL_VOICES[cleanRole] ? cleanRole : "narrator"),
             hasSample,
-            enabled: (hasSample || Boolean(vc.overrideVoiceId)) ? enabled : false,
+            enabled: (hasSample || Boolean(effectiveOverride)) ? enabled : false,
             version: row ? Number(row.version) || 1 : 0,
             durationMs: row ? Number(row.duration_ms) || 0 : 0,
             sampleText: row ? cleanStr(row.sample_text, 400) : "",
@@ -523,7 +555,7 @@ export class StoryMailboxDO extends DurableObject {
             configSource: vc.configSource,
             apiKeyMasked: vc.apiKeyMasked,
             providerVoiceSynced,
-            overrideVoiceConfigured: Boolean(vc.overrideVoiceId),
+            overrideVoiceConfigured: Boolean(effectiveOverride),
             lastError: row ? cleanStr(row.last_error, 260) : ""
         };
     }
@@ -936,6 +968,36 @@ export class StoryMailboxDO extends DurableObject {
             if (path.startsWith("/api/voice-profile")) {
                 const role = sanitizeVoiceRole(url.searchParams.get("role"));
 
+                if (request.method === "GET" && (path === "/api/voice-profiles" || path === "/api/voice-profiles/")) {
+                    const vc = this._getEffectiveVoiceCloneConfig();
+                    const rows = this._listVoiceProfileMetaRows();
+                    const profiles = {};
+                    for (const row of rows) {
+                        const rId = sanitizeVoiceRole(row.role);
+                        profiles[rId] = this._formatPublicVoiceProfile(row, rId);
+                    }
+                    if (!profiles.pea) {
+                        profiles.pea = this._formatPublicVoiceProfile(null, "pea");
+                    }
+                    const list = Object.values(profiles);
+                    const activeCount = list.filter((p) => p.cloneReady).length;
+                    const sampleCount = list.filter((p) => p.hasSample || p.overrideVoiceConfigured).length;
+                    return jsonResponse({
+                        ok: true,
+                        provider: {
+                            provider: vc.provider,
+                            providerLabel: vc.providerLabel,
+                            providerConfigured: vc.configured,
+                            configSource: vc.configSource,
+                            apiKeyMasked: vc.apiKeyMasked,
+                            overrideVoiceConfigured: Boolean(vc.overrideVoiceId)
+                        },
+                        profiles,
+                        activeCount,
+                        sampleCount
+                    });
+                }
+
                 if (request.method === "GET" && path === "/api/voice-profile") {
                     const row = this._getVoiceProfileRow(role);
                     return jsonResponse({ ok: true, profile: this._formatPublicVoiceProfile(row, role) });
@@ -962,20 +1024,26 @@ export class StoryMailboxDO extends DurableObject {
                     }
                     const row = this._getVoiceProfileRow(role);
                     const vc = this._getEffectiveVoiceCloneConfig();
+                    const effectiveOverride = role === "pea" ? vc.overrideVoiceId : "";
                     const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
-                    const enabled = row ? Number(row.enabled) !== 0 : Boolean(vc.overrideVoiceId);
+                    const enabled = row ? Number(row.enabled) !== 0 : Boolean(effectiveOverride);
                     return jsonResponse({
                         ok: true,
                         role,
+                        displayName: cleanStr(row?.display_name, 32) || (role === "pea" ? "小豌豆" : ""),
+                        fallbackRole: cleanStr(row?.fallback_role, 32) || (ROLE_NEURAL_VOICES[role] ? role : "narrator"),
                         hasSample,
                         sampleAudioB64: hasSample ? row.sample_audio_b64 : "",
                         sampleMime: row ? (cleanStr(row.sample_mime, 64) || "audio/wav") : "audio/wav",
                         sampleText: row ? cleanStr(row.sample_text, 400) : "",
-                        enabled: (hasSample || Boolean(vc.overrideVoiceId)) ? enabled : false,
+                        enabled: (hasSample || Boolean(effectiveOverride)) ? enabled : false,
                         version: row ? Number(row.version) || 1 : 0,
                         provider: row ? cleanStr(row.provider, 40) : "",
                         providerVoiceId: row ? cleanStr(row.provider_voice_id, 260) : "",
-                        effectiveConfig: vc
+                        effectiveConfig: {
+                            ...vc,
+                            overrideVoiceId: effectiveOverride
+                        }
                     });
                 }
 
@@ -1004,29 +1072,41 @@ export class StoryMailboxDO extends DurableObject {
                     }
 
                     const vc = this._getEffectiveVoiceCloneConfig();
-                    const row = this._getVoiceProfileRow("pea");
-                    const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
-                    if (vc.configured && hasSample) {
-                        try {
-                            const providerVoiceId = await enrollClonedVoice(vc, {
-                                sampleAudioB64: row.sample_audio_b64,
-                                sampleMime: row.sample_mime || "audio/wav",
-                                sampleText: row.sample_text || "",
-                                version: Number(row.version) || 1
-                            });
-                            this._updateVoiceSyncMetadata("pea", {
-                                provider: vc.provider,
-                                providerVoiceId,
-                                syncedAt: Date.now(),
-                                lastError: ""
-                            });
-                        } catch (err) {
-                            this._updateVoiceSyncMetadata("pea", {
-                                provider: vc.provider,
-                                providerVoiceId: "",
-                                syncedAt: 0,
-                                lastError: err?.message || String(err)
-                            });
+                    if (vc.configured) {
+                        const sampledRows = this.ctx.storage.sql.exec(
+                            `SELECT role, sample_audio_b64, sample_mime, sample_text, version, provider, provider_voice_id
+                             FROM voice_profiles
+                             WHERE LENGTH(sample_audio_b64) > 32
+                             ORDER BY CASE WHEN role = 'pea' THEN 0 ELSE 1 END, updated_at DESC
+                             LIMIT 5`
+                        ).toArray();
+                        for (const r of sampledRows) {
+                            const rId = sanitizeVoiceRole(r.role);
+                            const needsEnroll = !cleanStr(r.provider_voice_id, 260) || r.provider !== vc.provider;
+                            if (!needsEnroll) continue;
+                            const vcForRole = { ...vc, overrideVoiceId: rId === "pea" ? vc.overrideVoiceId : "" };
+                            try {
+                                const providerVoiceId = await enrollClonedVoice(vcForRole, {
+                                    role: rId,
+                                    sampleAudioB64: r.sample_audio_b64,
+                                    sampleMime: r.sample_mime || "audio/wav",
+                                    sampleText: r.sample_text || "",
+                                    version: Number(r.version) || 1
+                                });
+                                this._updateVoiceSyncMetadata(rId, {
+                                    provider: vc.provider,
+                                    providerVoiceId,
+                                    syncedAt: Date.now(),
+                                    lastError: ""
+                                });
+                            } catch (err) {
+                                this._updateVoiceSyncMetadata(rId, {
+                                    provider: vc.provider,
+                                    providerVoiceId: "",
+                                    syncedAt: 0,
+                                    lastError: err?.message || String(err)
+                                });
+                            }
                         }
                     }
 
@@ -1056,19 +1136,25 @@ export class StoryMailboxDO extends DurableObject {
                     if (rawB64.length < 2000 || rawB64.length > 1_400_000) {
                         return jsonResponse({ ok: false, error: "invalid_sample_audio" }, 400);
                     }
-                    const sampleMime = cleanStr(body.sampleMime, 64) || "audio/wav";
-                    const sampleText = cleanStr(body.sampleText, 400) || "大家好，我是小豌豆！欢迎来到我的魔法故事漫画屋！";
-                    const durationMs = Math.max(1500, Math.min(25000, Math.floor(Number(body.durationMs) || 10000)));
                     const prev = this._getVoiceProfileRow(targetRole);
+                    const displayName = cleanStr(body.displayName, 32) || cleanStr(prev?.display_name, 32) || (targetRole === "pea" ? "小豌豆" : targetRole);
+                    const emoji = cleanStr(body.emoji, 16) || cleanStr(prev?.emoji, 16) || (targetRole === "pea" ? "🐰" : "🎙️");
+                    const fallbackRole = cleanStr(body.fallbackRole, 32) || cleanStr(prev?.fallback_role, 32) || (ROLE_NEURAL_VOICES[targetRole] ? targetRole : "narrator");
+                    const sampleMime = cleanStr(body.sampleMime, 64) || "audio/wav";
+                    const sampleText = cleanStr(body.sampleText, 400) || `大家好，我是${displayName}！欢迎来到小豌豆魔法故事漫画屋！`;
+                    const durationMs = Math.max(1500, Math.min(25000, Math.floor(Number(body.durationMs) || 10000)));
                     const nextVersion = (prev ? Number(prev.version) || 0 : 0) + 1;
                     const now = Date.now();
                     const updatedStr = formatBeijingTimeStr(now);
 
                     this.ctx.storage.sql.exec(
                         `INSERT INTO voice_profiles
-                            (role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version, provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str)
-                         VALUES (?, ?, ?, ?, ?, 1, ?, '', '', 0, '', ?, ?)
+                            (role, display_name, emoji, fallback_role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version, provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, '', '', 0, '', ?, ?)
                          ON CONFLICT(role) DO UPDATE SET
+                            display_name = CASE WHEN excluded.display_name != '' THEN excluded.display_name ELSE voice_profiles.display_name END,
+                            emoji = CASE WHEN excluded.emoji != '' THEN excluded.emoji ELSE voice_profiles.emoji END,
+                            fallback_role = CASE WHEN excluded.fallback_role != '' THEN excluded.fallback_role ELSE voice_profiles.fallback_role END,
                             sample_audio_b64 = excluded.sample_audio_b64,
                             sample_mime = excluded.sample_mime,
                             sample_text = excluded.sample_text,
@@ -1081,13 +1167,15 @@ export class StoryMailboxDO extends DurableObject {
                             last_error = '',
                             updated_at = excluded.updated_at,
                             updated_str = excluded.updated_str`,
-                        targetRole, rawB64, sampleMime, sampleText, durationMs, nextVersion, now, updatedStr
+                        targetRole, displayName, emoji, fallbackRole, rawB64, sampleMime, sampleText, durationMs, nextVersion, now, updatedStr
                     );
 
                     const vc = this._getEffectiveVoiceCloneConfig();
                     if (vc.configured) {
+                        const vcForRole = { ...vc, overrideVoiceId: targetRole === "pea" ? vc.overrideVoiceId : "" };
                         try {
-                            const providerVoiceId = await enrollClonedVoice(vc, {
+                            const providerVoiceId = await enrollClonedVoice(vcForRole, {
+                                role: targetRole,
                                 sampleAudioB64: rawB64,
                                 sampleMime,
                                 sampleText,
@@ -1120,20 +1208,21 @@ export class StoryMailboxDO extends DurableObject {
                     }
                     const targetRole = sanitizeVoiceRole(body.role || role);
                     const vc = this._getEffectiveVoiceCloneConfig();
+                    const effectiveOverride = targetRole === "pea" ? vc.overrideVoiceId : "";
                     const prev = this._getVoiceProfileRow(targetRole);
                     const now = Date.now();
                     const updatedStr = formatBeijingTimeStr(now);
                     const enabledVal = body.enabled ? 1 : 0;
 
                     if (!prev) {
-                        if (!vc.overrideVoiceId) {
+                        if (!effectiveOverride) {
                             return jsonResponse({ ok: false, error: "voice_profile_not_found" }, 404);
                         }
                         this.ctx.storage.sql.exec(
                             `INSERT INTO voice_profiles
-                                (role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version, provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str)
-                             VALUES (?, '', 'audio/wav', '', 0, ?, 1, ?, ?, ?, '', ?, ?)`,
-                            targetRole, enabledVal, vc.provider, vc.overrideVoiceId, now, now, updatedStr
+                                (role, display_name, emoji, fallback_role, sample_audio_b64, sample_mime, sample_text, duration_ms, enabled, version, provider, provider_voice_id, provider_synced_at, last_error, updated_at, updated_str)
+                             VALUES (?, '小豌豆', '🐰', 'pea', '', 'audio/wav', '', 0, ?, 1, ?, ?, ?, '', ?, ?)`,
+                            targetRole, enabledVal, vc.provider, effectiveOverride, now, now, updatedStr
                         );
                     } else {
                         this.ctx.storage.sql.exec(
@@ -1155,17 +1244,21 @@ export class StoryMailboxDO extends DurableObject {
                 if (request.method === "POST" && path === "/api/voice-profile/test") {
                     const body = await request.json().catch(() => ({}));
                     const targetRole = sanitizeVoiceRole(body.role || role);
-                    const cleanText = stripSpeechTextForTts(cleanStr(body.text, 240)) || "大家好，我是小豌豆！现在每一本故事书里都是我自己的声音啦！";
                     const row = this._getVoiceProfileRow(targetRole);
+                    const displayName = cleanStr(body.displayName, 32) || cleanStr(row?.display_name, 32) || (targetRole === "pea" ? "小豌豆" : targetRole);
+                    const fallbackRole = cleanStr(body.fallbackRole, 32) || cleanStr(row?.fallback_role, 32) || (ROLE_NEURAL_VOICES[targetRole] ? targetRole : "narrator");
+                    const cleanText = stripSpeechTextForTts(cleanStr(body.text, 240)) || `大家好，我是${displayName}！现在每一本故事书里都是我的声音啦！`;
                     const vc = this._getEffectiveVoiceCloneConfig();
+                    const effectiveOverride = targetRole === "pea" ? vc.overrideVoiceId : "";
+                    const vcForRole = { ...vc, overrideVoiceId: effectiveOverride };
                     const hasSample = Boolean(row && cleanStr(row.sample_audio_b64, 32));
 
-                    if (!hasSample && !vc.overrideVoiceId) {
+                    if (!hasSample && !effectiveOverride) {
                         return jsonResponse({
                             ok: true,
                             mode: "unconfigured",
                             audioBase64: "",
-                            message: "还没有录制小豌豆的声音样本哦，先按中间的录音按钮念一段吧！",
+                            message: `还没有录制${displayName}的声音样本哦，先按中间的录音按钮念一段吧！`,
                             profile: this._formatPublicVoiceProfile(row, targetRole)
                         });
                     }
@@ -1174,7 +1267,7 @@ export class StoryMailboxDO extends DurableObject {
                             ok: true,
                             mode: "unconfigured",
                             audioBase64: "",
-                            message: "小豌豆原声已经安全存好！还需爸爸妈妈在 Cloudflare 后台配置 VOICE_CLONE_API_KEY 密钥才能开启 AI 克隆试听哦。",
+                            message: `${displayName}原声已经安全存好！还需爸爸妈妈在 Cloudflare 后台配置 VOICE_CLONE_API_KEY 密钥才能开启 AI 克隆试听哦。`,
                             profile: this._formatPublicVoiceProfile(row, targetRole)
                         });
                     }
@@ -1183,16 +1276,17 @@ export class StoryMailboxDO extends DurableObject {
                             ok: true,
                             mode: "disabled",
                             audioBase64: "",
-                            message: "当前已暂停使用专属声音，打开上面的启用开关就能试听啦。",
+                            message: `当前已暂停使用${displayName}的专属声音，打开上面的启用开关就能试听啦。`,
                             profile: this._formatPublicVoiceProfile(row, targetRole)
                         });
                     }
 
                     try {
                         const res = await runClonedTtsWithEnroll({
-                            vcCfg: vc,
+                            vcCfg: vcForRole,
                             cleanText,
                             profile: {
+                                role: targetRole,
                                 hasSample,
                                 sampleAudioB64: hasSample ? row.sample_audio_b64 : "",
                                 sampleMime: row?.sample_mime || "audio/wav",
@@ -1210,7 +1304,7 @@ export class StoryMailboxDO extends DurableObject {
                             ok: true,
                             mode: "cloned",
                             audioBase64: res.audioBase64,
-                            message: `太棒啦！已用【${vc.providerLabel}】为你实时合成试听！`,
+                            message: `太棒啦！已用【${vc.providerLabel}】为你实时合成${displayName}的专属声音试听！`,
                             profile: this._formatPublicVoiceProfile(freshRow, targetRole)
                         });
                     } catch (err) {
@@ -1225,7 +1319,7 @@ export class StoryMailboxDO extends DurableObject {
                         }
                         let fallbackAudio = "";
                         try {
-                            fallbackAudio = await synthesizeNeuralMp3Base64(cleanText, targetRole);
+                            fallbackAudio = await synthesizeNeuralMp3Base64(cleanText, fallbackRole);
                         } catch (_) {}
                         const freshRow = this._getVoiceProfileRow(targetRole);
                         return jsonResponse({
@@ -1265,14 +1359,15 @@ export default {
                 try {
                     const id = env.STORY_MAILBOX.idFromName("pea-story-house-mailbox-v1");
                     const stub = env.STORY_MAILBOX.get(id);
-                    const vpRes = await stub.fetch("https://mailbox.internal/api/voice-profile?role=pea");
+                    const vpRes = await stub.fetch("https://mailbox.internal/api/voice-profiles");
                     const vpData = vpRes.ok ? await vpRes.json().catch(() => null) : null;
-                    if (vpData?.ok && vpData.profile) {
+                    if (vpData?.ok && vpData.provider) {
                         vc = {
-                            configured: Boolean(vpData.profile.providerConfigured),
-                            provider: vpData.profile.provider,
-                            providerLabel: vpData.profile.providerLabel,
-                            configSource: vpData.profile.configSource || "none"
+                            configured: Boolean(vpData.provider.providerConfigured),
+                            provider: vpData.provider.provider,
+                            providerLabel: vpData.provider.providerLabel,
+                            configSource: vpData.provider.configSource || "none",
+                            activeCount: Number(vpData.activeCount) || 0
                         };
                     }
                 } catch (_) {}
@@ -1287,7 +1382,8 @@ export default {
                     configured: Boolean(vc.configured),
                     provider: vc.provider,
                     providerLabel: vc.providerLabel,
-                    configSource: vc.configSource || "none"
+                    configSource: vc.configSource || "none",
+                    activeCount: Number(vc.activeCount) || 0
                 }
             });
         }
@@ -1298,6 +1394,8 @@ export default {
                     const body = await request.json().catch(() => ({}));
                     const text = cleanStr(body.text, 600);
                     const role = cleanStr(body.role, 32) || "narrator";
+                    const rawProfileId = cleanStr(body.voiceProfileId || body.characterId, 32);
+                    const cloneRole = rawProfileId ? sanitizeVoiceRole(rawProfileId) : (role === "pea" ? "pea" : "");
                     const cleanText = stripSpeechTextForTts(text);
                     if (!cleanText) {
                         return jsonResponse({ ok: false, error: "empty_text" }, 400);
@@ -1306,28 +1404,30 @@ export default {
                     const edgeCache = typeof caches !== "undefined" ? caches.default : null;
                     let activeVcProvider = "";
 
-                    if (role === "pea" && env?.STORY_MAILBOX) {
+                    if (cloneRole && env?.STORY_MAILBOX) {
                         try {
                             const id = env.STORY_MAILBOX.idFromName("pea-story-house-mailbox-v1");
                             const stub = env.STORY_MAILBOX.get(id);
-                            const rawRes = await stub.fetch("https://mailbox.internal/api/voice-profile/internal-raw?role=pea", {
+                            const rawRes = await stub.fetch(`https://mailbox.internal/api/voice-profile/internal-raw?role=${encodeURIComponent(cloneRole)}`, {
                                 headers: { "X-Internal-Worker": "pea-internal" }
                             });
                             const rawProfile = rawRes.ok ? await rawRes.json().catch(() => null) : null;
                             const vcCfg = rawProfile?.effectiveConfig || getVoiceCloneConfig(env);
+                            const effectiveOverride = cloneRole === "pea" ? (vcCfg?.overrideVoiceId || "") : "";
                             activeVcProvider = vcCfg?.provider || "";
 
-                            if (vcCfg && vcCfg.configured && rawProfile && rawProfile.ok && rawProfile.enabled && (rawProfile.hasSample || vcCfg.overrideVoiceId)) {
+                            if (vcCfg && vcCfg.configured && rawProfile && rawProfile.ok && rawProfile.enabled && (rawProfile.hasSample || effectiveOverride)) {
                                 const cloneHash = await sha256Hex(JSON.stringify({
-                                    v: 2,
+                                    v: 3,
                                     source: "clone",
+                                    voiceProfileId: cloneRole,
                                     provider: vcCfg.provider,
                                     model: vcCfg.model,
                                     voiceVersion: rawProfile.version || 0,
-                                    overrideVoiceId: vcCfg.overrideVoiceId,
+                                    overrideVoiceId: effectiveOverride,
                                     text: cleanText
                                 }));
-                                const cloneCacheReq = new Request(`https://tts-cache.pea-story-house.internal/v2/${cloneHash}`, { method: "GET" });
+                                const cloneCacheReq = new Request(`https://tts-cache.pea-story-house.internal/v3/${cloneHash}`, { method: "GET" });
 
                                 if (edgeCache) {
                                     try {
@@ -1349,7 +1449,7 @@ export default {
                                 }
 
                                 const cloned = await runClonedTtsWithEnroll({
-                                    vcCfg,
+                                    vcCfg: { ...vcCfg, overrideVoiceId: effectiveOverride },
                                     cleanText,
                                     profile: rawProfile,
                                     syncFn: async (meta) => {
@@ -1359,7 +1459,7 @@ export default {
                                                 "Content-Type": "application/json",
                                                 "X-Internal-Worker": "pea-internal"
                                             },
-                                            body: JSON.stringify({ role: "pea", ...meta })
+                                            body: JSON.stringify({ role: cloneRole, ...meta })
                                         }).catch(() => {});
                                     }
                                 });
@@ -1368,6 +1468,7 @@ export default {
                                     const clonePayload = JSON.stringify({
                                         ok: true,
                                         role,
+                                        voiceProfileId: cloneRole,
                                         voiceSource: "cloned",
                                         provider: vcCfg.provider,
                                         voiceVersion: rawProfile.version || 1,
@@ -1411,7 +1512,7 @@ export default {
                                         "X-Internal-Worker": "pea-internal"
                                     },
                                     body: JSON.stringify({
-                                        role: "pea",
+                                        role: cloneRole,
                                         provider: activeVcProvider || "siliconflow",
                                         lastError: cloneErr?.message || String(cloneErr)
                                     })

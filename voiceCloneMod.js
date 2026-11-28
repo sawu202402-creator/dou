@@ -146,9 +146,10 @@ function isVoiceMissingSignal(code, message = "") {
 }
 
 /**
- * 在配置的声音克隆平台注册/绑定小豌豆声音样本，返回 providerVoiceId
+ * 在配置的声音克隆平台注册/绑定角色声音样本，返回 providerVoiceId
  */
 export async function enrollClonedVoice(cfg, {
+    role = "pea",
     sampleAudioB64 = "",
     sampleMime = "audio/wav",
     sampleText = "",
@@ -157,7 +158,8 @@ export async function enrollClonedVoice(cfg, {
     if (!cfg || !cfg.configured) {
         throw new Error("voice_clone_not_configured");
     }
-    if (cfg.overrideVoiceId) {
+    const safeRole = cleanStr(role, 20).replace(/[^a-zA-Z0-9_]/g, "_") || "pea";
+    if (safeRole === "pea" && cfg.overrideVoiceId) {
         return cfg.overrideVoiceId;
     }
 
@@ -178,7 +180,7 @@ export async function enrollClonedVoice(cfg, {
             },
             body: JSON.stringify({
                 model: cfg.model,
-                customName: `pea_voice_v${verNum}_${Date.now().toString(36).slice(-4)}`,
+                customName: `${safeRole}_voice_v${verNum}_${Date.now().toString(36).slice(-4)}`,
                 audio: `data:${safeMime};base64,${cleanB64}`,
                 text: transcript
             })
@@ -203,7 +205,7 @@ export async function enrollClonedVoice(cfg, {
             : (safeMime.includes("mp4") || safeMime.includes("m4a") ? "m4a" : "wav");
         const fd = new FormData();
         fd.append("purpose", "voice_clone");
-        fd.append("file", new Blob([bytes], { type: safeMime }), `pea_sample_v${verNum}.${ext}`);
+        fd.append("file", new Blob([bytes], { type: safeMime }), `${safeRole}_sample_v${verNum}.${ext}`);
 
         const uploadRes = await fetchWithTimeout(`${cfg.baseUrl}/v1/files/upload`, {
             method: "POST",
@@ -224,7 +226,7 @@ export async function enrollClonedVoice(cfg, {
             throw new Error(`minimax_upload_err_${uploadStatus}: ${uploadData?.base_resp?.status_msg || "no_file_id"}`);
         }
 
-        const voiceId = `pea_story_v${verNum}_${Date.now().toString(36).slice(-5)}`;
+        const voiceId = `${safeRole}_story_v${verNum}_${Date.now().toString(36).slice(-5)}`;
         const cloneRes = await fetchWithTimeout(`${cfg.baseUrl}/v1/voice_clone`, {
             method: "POST",
             headers: {
@@ -253,17 +255,18 @@ export async function enrollClonedVoice(cfg, {
 
     if (cfg.provider === "fishaudio") {
         // Fish Audio 支持在每次 /v1/tts 请求内直传 references 做零样本克隆
-        return `zeroshot_sample_v${verNum}`;
+        return `zeroshot_${safeRole}_v${verNum}`;
     }
 
     throw new Error(`unsupported_provider_${cfg.provider}`);
 }
 
 /**
- * 使用小豌豆专属克隆音色合成中文台词 MP3（返回 Base64 audio/mpeg）
+ * 使用已注册的专属克隆音色合成中文台词 MP3（返回 Base64 audio/mpeg）
  */
 export async function synthesizeClonedSpeech(cfg, {
     text,
+    role = "pea",
     providerVoiceId = "",
     sampleAudioB64 = "",
     sampleText = ""
@@ -275,7 +278,8 @@ export async function synthesizeClonedSpeech(cfg, {
     if (!cleanText) {
         throw new Error("empty_tts_text");
     }
-    const voiceId = cleanStr(cfg.overrideVoiceId || providerVoiceId, 260);
+    const safeRole = cleanStr(role, 20).replace(/[^a-zA-Z0-9_]/g, "_") || "pea";
+    const voiceId = cleanStr((safeRole === "pea" ? cfg.overrideVoiceId : "") || providerVoiceId, 260);
     if (!voiceId) {
         throw new VoiceNotFoundError("missing_provider_voice_id");
     }

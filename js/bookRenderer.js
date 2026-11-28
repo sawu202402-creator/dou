@@ -32,6 +32,7 @@ export function renderBookshelf(container, books, {
     updatedJustNow = false,
     readingProgress = {},
     voiceProfile = null,
+    voiceSummary = null,
     onOpenBook,
     onHoverBook,
     onOpenMailbox,
@@ -85,10 +86,17 @@ export function renderBookshelf(container, books, {
     `;
 
     const vp = voiceProfile || {};
-    const voicePillLabel = vp.cloneReady
-        ? '🎙️ 专属声音生效中'
-        : (vp.hasSample ? '🎙️ 原声已存(待Key)' : '🎙️ 录小豌豆真实声音');
-    const voicePillReadyCls = vp.cloneReady ? ' is-ready' : '';
+    const activeCount = Number(voiceSummary?.activeCount) || (vp.cloneReady ? 1 : 0);
+    const sampleCount = Number(voiceSummary?.sampleCount) || ((vp.hasSample || vp.overrideVoiceConfigured) ? 1 : 0);
+    let voicePillLabel = '🎙️ 录小豌豆和朋友声音';
+    if (activeCount > 1) {
+        voicePillLabel = `🎙️ ${activeCount} 个专属声音生效中`;
+    } else if (activeCount === 1) {
+        voicePillLabel = '🎙️ 专属声音生效中';
+    } else if (sampleCount > 0) {
+        voicePillLabel = '🎙️ 原声已存(待Key)';
+    }
+    const voicePillReadyCls = activeCount > 0 ? ' is-ready' : '';
 
     container.innerHTML = `
         <section class="shelf-hero">
@@ -411,9 +419,11 @@ export function renderComicPage(container, book, page, {
     pageIndex = 0,
     totalPages = 1,
     speakingKey = '',
+    isCharacterCloned = () => false,
     onSpeakItem,
     onZoomImage,
-    onEditTarget
+    onEditTarget,
+    onOpenVoiceForCharacter
 } = {}) {
     if (!container || !book || !page) return;
 
@@ -421,7 +431,7 @@ export function renderComicPage(container, book, page, {
     const panels = page.panels || [];
     const layout = page.comicLayout || 'hero-top';
 
-    // 收集本页出场角色作为图例
+    // 收集本页出场角色作为可点击录音图例
     const appearingCharIds = new Set();
     panels.forEach((panel) => {
         (panel.bubbles || []).forEach((b) => {
@@ -430,8 +440,20 @@ export function renderComicPage(container, book, page, {
     });
 
     const castPills = Array.from(appearingCharIds).map((cid) => {
-        const ch = characters[cid] || { name: cid, emoji: '💬', badgeBg: '#FFE8EE' };
-        return `<span class="cast-pill" style="--cast-bg:${escapeHtml(ch.badgeBg || '#FFE8EE')}">${escapeHtml(ch.emoji || '')} ${escapeHtml(ch.name)}</span>`;
+        const ch = characters[cid] || { name: cid, emoji: '💬', voiceRole: 'narrator', badgeBg: '#FFE8EE' };
+        const cloned = Boolean(isCharacterCloned(cid, ch.name));
+        const fallbackRole = ch.voiceRole || (cid === 'narrator' ? 'narrator' : 'fairy');
+        return `<button type="button"
+            class="cast-pill cast-pill-btn ${cloned ? 'is-cloned' : ''}"
+            data-char-id="${escapeHtml(cid)}"
+            data-char-name="${escapeHtml(ch.name)}"
+            data-char-emoji="${escapeHtml(ch.emoji || '🎙️')}"
+            data-fallback-role="${escapeHtml(fallbackRole)}"
+            title="点这里录制或管理「${escapeHtml(ch.name)}」的专属声音"
+            style="--cast-bg:${escapeHtml(ch.badgeBg || '#FFE8EE')}">
+            <span>${escapeHtml(ch.emoji || '')} ${escapeHtml(ch.name)}</span>
+            <span class="cast-mic-tag">${cloned ? '✨已录' : '🎙️录声'}</span>
+        </button>`;
     }).join('');
 
     const panelsHtml = panels.map((panel, pIdx) => {
@@ -468,20 +490,22 @@ export function renderComicPage(container, book, page, {
             const bKey = buildComicBubbleSpeakKey(book.id, page.pageNumber, pIdx, bIdx);
             const active = speakingKey === bKey ? 'is-speaking' : '';
             const sideCls = b.side === 'right' ? 'side-right' : 'side-left';
+            const bubbleCloned = Boolean(isCharacterCloned(b.characterId, ch.name));
             return `
                 <button type="button"
-                    class="comic-bubble ${sideCls} ${active}"
+                    class="comic-bubble ${sideCls} ${active} ${bubbleCloned ? 'has-cloned-voice' : ''}"
                     data-kind="bubble"
                     data-panel-idx="${pIdx}"
                     data-bubble-idx="${bIdx}"
                     data-character="${escapeHtml(b.characterId)}"
+                    data-character-name="${escapeHtml(ch.name)}"
                     data-role="${escapeHtml(ch.voiceRole || 'narrator')}"
                     data-speak-key="${escapeHtml(bKey)}"
                     style="--bubble-bg:${escapeHtml(ch.bubbleBg || '#FFFDF7')}; --bubble-border:${escapeHtml(ch.bubbleBorder || '#5C4B99')}; --badge-bg:${escapeHtml(ch.badgeBg || '#EFEAFF')};">
                     <span class="comic-bubble-tail" aria-hidden="true"></span>
                     <span class="bubble-header">
                         <span class="bubble-char-badge">${escapeHtml(ch.emoji || '')} ${escapeHtml(ch.name)}</span>
-                        <span class="bubble-voice-icon" aria-hidden="true">🔊</span>
+                        <span class="bubble-voice-icons">${bubbleCloned ? '<span class="bubble-cloned-tag">✨真声</span>' : ''}<span class="bubble-voice-icon" aria-hidden="true">🔊</span></span>
                     </span>
                     <span class="bubble-text">${renderPinyinHtml(b.text, b.pinyin)}</span>
                 </button>
@@ -517,7 +541,7 @@ export function renderComicPage(container, book, page, {
                 </div>
                 <div class="comic-cast-bar">
                     <div class="cast-pills">${castPills}</div>
-                    <span class="comic-tap-tip">💡 点气泡听角色配音，点图画可放大看细节！</span>
+                    <span class="comic-tap-tip">💡 点气泡听角色配音，点角色徽章可录真实声音！</span>
                 </div>
             </header>
             <div class="comic-grid" data-layout="${escapeHtml(layout)}" data-panel-count="${panels.length}">
@@ -525,6 +549,19 @@ export function renderComicPage(container, book, page, {
             </div>
         </section>
     `;
+
+    container.querySelectorAll('.cast-pill-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (typeof onOpenVoiceForCharacter === 'function') {
+                onOpenVoiceForCharacter({
+                    id: btn.getAttribute('data-char-id') || '',
+                    name: btn.getAttribute('data-char-name') || '',
+                    emoji: btn.getAttribute('data-char-emoji') || '🎙️',
+                    fallbackRole: btn.getAttribute('data-fallback-role') || 'fairy'
+                });
+            }
+        });
+    });
 
     const editComicPageBtn = container.querySelector('#btn-edit-comic-page');
     if (editComicPageBtn && typeof onEditTarget === 'function') {
@@ -571,6 +608,8 @@ export function renderComicPage(container, book, page, {
                 onSpeakItem({
                     text: panel.caption,
                     role: 'narrator',
+                    characterId: 'narrator',
+                    characterName: '故事姐姐',
                     speakKey: btn.getAttribute('data-speak-key')
                 });
             }
@@ -587,6 +626,8 @@ export function renderComicPage(container, book, page, {
                 onSpeakItem({
                     text: bubble.text,
                     role,
+                    characterId: bubble.characterId || '',
+                    characterName: btn.getAttribute('data-character-name') || '',
                     speakKey: btn.getAttribute('data-speak-key')
                 });
             }

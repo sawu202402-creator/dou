@@ -74,32 +74,49 @@ function startLocalServer() {
     };
     const mailboxLog = { transcribeCalls: 0, wishCalls: 0, replyCalls: 0, patrolPostCalls: 0, dispatchCalls: 0, lastWhisperHints: '' };
     let dispatchRequestedAt = 0;
-    let voiceSampleAudioB64 = '';
-    let voiceProfile = {
-        role: 'pea',
-        hasSample: false,
-        enabled: false,
-        version: 0,
-        durationMs: 0,
-        sampleText: '',
-        sampleMime: 'audio/wav',
-        updatedAt: 0,
-        updatedStr: '',
-        cloneReady: false,
+    const voiceSampleMap = new Map();
+    const voiceProviderCfg = {
         provider: 'siliconflow',
         providerLabel: '硅基流动 SiliconFlow (CosyVoice2)',
         providerConfigured: true,
         configSource: 'cloud_do',
         apiKeyMasked: 'sk-t...7890',
-        providerVoiceSynced: false,
-        overrideVoiceConfigured: false,
-        lastError: ''
+        overrideVoiceConfigured: false
     };
+    const voiceProfileMap = new Map();
+    const buildVoiceProfileObj = (roleId = 'pea') => {
+        const cleanRole = String(roleId || 'pea').trim() || 'pea';
+        const prev = voiceProfileMap.get(cleanRole);
+        const hasSample = Boolean(voiceSampleMap.get(cleanRole));
+        const base = {
+            role: cleanRole,
+            displayName: cleanRole === 'pea' ? '小豌豆' : cleanRole,
+            emoji: cleanRole === 'pea' ? '🐰' : '🎙️',
+            fallbackRole: cleanRole === 'pea' ? 'pea' : 'narrator',
+            hasSample,
+            enabled: false,
+            version: 0,
+            durationMs: 0,
+            sampleText: '',
+            sampleMime: 'audio/wav',
+            updatedAt: 0,
+            updatedStr: '',
+            cloneReady: false,
+            providerVoiceSynced: false,
+            lastError: ''
+        };
+        const merged = prev ? { ...base, ...prev, ...voiceProviderCfg } : { ...base, ...voiceProviderCfg };
+        merged.overrideVoiceConfigured = cleanRole === 'pea' ? Boolean(voiceProviderCfg.overrideVoiceConfigured) : false;
+        merged.cloneReady = Boolean(voiceProviderCfg.providerConfigured && merged.enabled && merged.hasSample);
+        return merged;
+    };
+    voiceProfileMap.set('pea', buildVoiceProfileObj('pea'));
     let liveVersionObj = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
 
     const srv = http.createServer((req, res) => {
         const rawUrl = req.url || '/';
-        const urlPath = decodeURIComponent(rawUrl.split('?')[0]);
+        const parsedReqUrl = new URL(rawUrl, 'http://127.0.0.1');
+        const urlPath = decodeURIComponent(parsedReqUrl.pathname);
 
         if (urlPath === '/api/health') {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -108,7 +125,12 @@ function startLocalServer() {
                 service: 'pea-story-house-e2e',
                 ai: true,
                 mailbox: true,
-                voiceClone: { configured: true, provider: 'siliconflow', providerLabel: voiceProfile.providerLabel }
+                voiceClone: {
+                    configured: true,
+                    provider: voiceProviderCfg.provider,
+                    providerLabel: voiceProviderCfg.providerLabel,
+                    configSource: voiceProviderCfg.configSource
+                }
             }));
             return;
         }
@@ -118,90 +140,121 @@ function startLocalServer() {
             req.on('data', (chunk) => { bodyRaw += chunk.toString(); });
             req.on('end', () => {
                 const body = bodyRaw ? JSON.parse(bodyRaw) : {};
-                if (req.method === 'GET' && urlPath === '/api/voice-profile') {
-                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
-                    return;
-                }
-                if (req.method === 'GET' && urlPath === '/api/voice-profile/sample') {
+                const qRole = String(parsedReqUrl.searchParams.get('role') || 'pea').trim() || 'pea';
+
+                if (req.method === 'GET' && urlPath === '/api/voice-profiles') {
+                    const profiles = {};
+                    for (const rId of voiceProfileMap.keys()) {
+                        profiles[rId] = buildVoiceProfileObj(rId);
+                    }
+                    if (!profiles.pea) profiles.pea = buildVoiceProfileObj('pea');
+                    const list = Object.values(profiles);
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         ok: true,
-                        role: 'pea',
-                        hasSample: voiceProfile.hasSample,
-                        audioBase64: voiceSampleAudioB64,
-                        sampleMime: voiceProfile.sampleMime,
-                        durationMs: voiceProfile.durationMs,
-                        sampleText: voiceProfile.sampleText,
-                        version: voiceProfile.version
+                        provider: voiceProviderCfg,
+                        profiles,
+                        activeCount: list.filter((p) => p.cloneReady).length,
+                        sampleCount: list.filter((p) => p.hasSample).length
+                    }));
+                    return;
+                }
+                if (req.method === 'GET' && urlPath === '/api/voice-profile') {
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ ok: true, profile: buildVoiceProfileObj(qRole) }));
+                    return;
+                }
+                if (req.method === 'GET' && urlPath === '/api/voice-profile/sample') {
+                    const prof = buildVoiceProfileObj(qRole);
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({
+                        ok: true,
+                        role: qRole,
+                        hasSample: prof.hasSample,
+                        audioBase64: voiceSampleMap.get(qRole) || '',
+                        sampleMime: prof.sampleMime,
+                        durationMs: prof.durationMs,
+                        sampleText: prof.sampleText,
+                        version: prof.version
                     }));
                     return;
                 }
                 if (req.method === 'POST' && urlPath === '/api/voice-profile') {
-                    voiceSampleAudioB64 = String(body.audioBase64 || '');
-                    voiceProfile = {
-                        ...voiceProfile,
-                        hasSample: voiceSampleAudioB64.length >= 2000,
+                    const targetRole = String(body.role || qRole || 'pea').trim() || 'pea';
+                    const rawB64 = String(body.audioBase64 || '');
+                    voiceSampleMap.set(targetRole, rawB64);
+                    const prev = buildVoiceProfileObj(targetRole);
+                    const next = {
+                        ...prev,
+                        role: targetRole,
+                        displayName: String(body.displayName || prev.displayName || targetRole),
+                        emoji: String(body.emoji || prev.emoji || '🎙️'),
+                        fallbackRole: String(body.fallbackRole || prev.fallbackRole || 'narrator'),
+                        hasSample: rawB64.length >= 2000,
                         enabled: true,
-                        version: (voiceProfile.version || 0) + 1,
+                        version: (prev.version || 0) + 1,
                         durationMs: Number(body.durationMs) || 8500,
                         sampleText: String(body.sampleText || ''),
                         sampleMime: String(body.sampleMime || 'audio/wav'),
                         updatedAt: Date.now(),
-                        updatedStr: '11/28 12:35',
+                        updatedStr: '11/28 13:30',
                         providerVoiceSynced: true,
-                        cloneReady: voiceSampleAudioB64.length >= 2000
+                        cloneReady: rawB64.length >= 2000
                     };
+                    voiceProfileMap.set(targetRole, next);
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    res.end(JSON.stringify({ ok: true, profile: buildVoiceProfileObj(targetRole) }));
                     return;
                 }
                 if (req.method === 'POST' && urlPath === '/api/voice-profile/toggle') {
-                    voiceProfile = {
-                        ...voiceProfile,
+                    const targetRole = String(body.role || qRole || 'pea').trim() || 'pea';
+                    const prev = buildVoiceProfileObj(targetRole);
+                    voiceProfileMap.set(targetRole, {
+                        ...prev,
                         enabled: Boolean(body.enabled),
-                        cloneReady: Boolean(body.enabled) && voiceProfile.hasSample && voiceProfile.providerConfigured
-                    };
+                        cloneReady: Boolean(body.enabled) && prev.hasSample && voiceProviderCfg.providerConfigured
+                    });
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    res.end(JSON.stringify({ ok: true, profile: buildVoiceProfileObj(targetRole) }));
                     return;
                 }
                 if (req.method === 'POST' && urlPath === '/api/voice-profile/test') {
+                    const targetRole = String(body.role || qRole || 'pea').trim() || 'pea';
+                    const prof = buildVoiceProfileObj(targetRole);
+                    const dName = String(body.displayName || prof.displayName || targetRole);
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                     res.end(JSON.stringify({
                         ok: true,
-                        mode: voiceProfile.cloneReady ? 'cloned' : 'unconfigured',
+                        mode: prof.cloneReady ? 'cloned' : 'unconfigured',
                         audioBase64: sampleWavBase64,
-                        message: voiceProfile.cloneReady ? '已用专属 AI 克隆声线试听！' : '待配置',
-                        profile: voiceProfile
+                        message: prof.cloneReady ? `已用专属 AI 克隆声线试听 ${dName}！` : '待配置',
+                        profile: prof
                     }));
                     return;
                 }
                 if (req.method === 'POST' && urlPath === '/api/voice-profile/delete') {
-                    voiceSampleAudioB64 = '';
-                    voiceProfile = {
-                        ...voiceProfile,
+                    const targetRole = String(body.role || qRole || 'pea').trim() || 'pea';
+                    voiceSampleMap.delete(targetRole);
+                    const prev = buildVoiceProfileObj(targetRole);
+                    voiceProfileMap.set(targetRole, {
+                        ...prev,
                         hasSample: false,
                         enabled: false,
                         providerVoiceSynced: false,
                         cloneReady: false
-                    };
+                    });
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    res.end(JSON.stringify({ ok: true, profile: buildVoiceProfileObj(targetRole) }));
                     return;
                 }
                 if (req.method === 'POST' && urlPath === '/api/voice-profile/config') {
                     const keyStr = String(body.apiKey || '').trim();
-                    const masked = keyStr ? `${keyStr.slice(0, 4)}...${keyStr.slice(-4)}` : voiceProfile.apiKeyMasked;
-                    voiceProfile = {
-                        ...voiceProfile,
-                        provider: body.provider || voiceProfile.provider,
-                        providerConfigured: Boolean(masked),
-                        configSource: 'cloud_do',
-                        apiKeyMasked: masked
-                    };
+                    const masked = keyStr ? `${keyStr.slice(0, 4)}...${keyStr.slice(-4)}` : voiceProviderCfg.apiKeyMasked;
+                    voiceProviderCfg.provider = body.provider || voiceProviderCfg.provider;
+                    voiceProviderCfg.providerConfigured = Boolean(masked);
+                    voiceProviderCfg.apiKeyMasked = masked;
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                    res.end(JSON.stringify({ ok: true, profile: voiceProfile }));
+                    res.end(JSON.stringify({ ok: true, profile: buildVoiceProfileObj('pea') }));
                     return;
                 }
                 res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -216,10 +269,13 @@ function startLocalServer() {
             req.on('end', () => {
                 const parsed = bodyRaw ? JSON.parse(bodyRaw) : {};
                 const reqRole = String(parsed.role || 'narrator');
-                const voiceSource = (reqRole === 'pea' && voiceProfile.cloneReady) ? 'cloned' : 'neural';
+                const reqProfileId = String(parsed.voiceProfileId || (reqRole === 'pea' ? 'pea' : '')).trim();
+                const prof = reqProfileId ? buildVoiceProfileObj(reqProfileId) : null;
+                const voiceSource = (prof && prof.cloneReady) ? 'cloned' : 'neural';
                 ttsLog.push({
                     text: String(parsed.text || ''),
                     role: reqRole,
+                    voiceProfileId: reqProfileId,
                     voiceSource,
                     ts: Date.now()
                 });
@@ -228,7 +284,7 @@ function startLocalServer() {
                     'Cache-Control': 'no-store',
                     'X-Voice-Source': voiceSource
                 });
-                res.end(JSON.stringify({ ok: true, role: reqRole, voiceSource, audioBase64: sampleWavBase64 }));
+                res.end(JSON.stringify({ ok: true, role: reqRole, voiceProfileId: reqProfileId, voiceSource, audioBase64: sampleWavBase64 }));
             });
             return;
         }
@@ -712,14 +768,79 @@ async function main() {
         await waitFor(`document.getElementById('vsStatusHint').textContent.includes('试听')`, 4000, 'test cloned voice preview');
 
         await evalJs(`document.getElementById('vsEnableSwitch').click()`);
-        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile().cloneReady === false && window.__PEA_STORY_HOUSE__.audioEngine._voiceSig === 'default'`, 3000, 'toggle clone off');
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile('pea').cloneReady === false && window.__PEA_STORY_HOUSE__.audioEngine._voiceSig === 'default'`, 3000, 'toggle clone off');
         await evalJs(`document.getElementById('vsEnableSwitch').click()`);
-        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile().cloneReady === true && window.__PEA_STORY_HOUSE__.audioEngine._voiceSig.startsWith('clone-')`, 3000, 'toggle clone back on');
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile('pea').cloneReady === true && window.__PEA_STORY_HOUSE__.audioEngine._voiceSig.startsWith('clone-')`, 3000, 'toggle clone back on');
+
+        // 切换到好朋友【烟烟】录制专属声线并验证与小豌豆互不冲突
+        await waitFor(`Boolean(document.querySelector('.vs-char-chip[data-char-id="yanyan"]'))`, 4000, 'yanyan chip loaded');
+        await evalJs(`document.querySelector('.vs-char-chip[data-char-id="yanyan"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.activeRoleId === 'yanyan' && document.getElementById('vsStatusTitle').textContent.includes('烟烟')`, 3000, 'select yanyan char');
+        assert.equal(await evalJs(`document.getElementById('vsSavedCard').hidden`), true, '未录过的朋友不应显示已保存卡');
+        await evalJs(`document.getElementById('vsRecBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.isRecording === true`, 2000, 'yanyan mock record start');
+        await evalJs(`document.getElementById('vsRecBtn').click()`);
+        await waitFor(`document.getElementById('vsDraftActions').hidden === false`, 2000, 'yanyan mock record stop');
+        await evalJs(`document.getElementById('vsSaveBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getProfile('yanyan').cloneReady === true`, 4000, 'save yanyan clone profile');
+        assert.ok(await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine._voiceSigMap.get('yanyan')?.startsWith('clone-')`), '保存朋友声线后应更新 yanyan 音频缓存签名');
+        await evalJs(`document.getElementById('vsTestCloneBtn').click()`);
+        await waitFor(`document.getElementById('vsStatusHint').textContent.includes('烟烟')`, 4000, 'test yanyan cloned preview');
+
+        // 验证「➕ 新朋友」重名防重复 & 新增【🐼 乐乐】
+        await evalJs(`document.getElementById('vsAddFriendBtn').click()`);
+        await waitFor(`document.getElementById('vsAddFriendBar').hidden === false`, 2000, 'open add friend bar');
+        await evalJs(`(() => { const inp = document.getElementById('vsFriendNameInput'); inp.value = '烟烟'; })()`);
+        await evalJs(`document.getElementById('vsFriendConfirmBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.activeRoleId === 'yanyan' && document.getElementById('vsAddFriendBar').hidden === true`, 2000, 'duplicate friend name selects existing');
+
+        await evalJs(`document.getElementById('vsAddFriendBtn').click()`);
+        await waitFor(`document.getElementById('vsAddFriendBar').hidden === false`, 2000, 'reopen add friend bar');
+        await evalJs(`document.querySelector('.vs-emoji-pick[data-emoji="🐼"]').click()`);
+        await evalJs(`(() => { const inp = document.getElementById('vsFriendNameInput'); inp.value = '乐乐'; })()`);
+        await evalJs(`document.getElementById('vsFriendConfirmBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.activeRoleId.startsWith('friend_') && document.getElementById('vsStatusTitle').textContent.includes('乐乐')`, 3000, 'added custom friend lele');
+        await evalJs(`document.getElementById('vsRecBtn').click()`);
+        await evalJs(`document.getElementById('vsRecBtn').click()`);
+        await waitFor(`document.getElementById('vsDraftActions').hidden === false`, 2000, 'lele mock record stop');
+        await evalJs(`document.getElementById('vsSaveBtn').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.voiceStudio.getSummary().activeCount === 3`, 4000, '3 cloned voices active');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '分屏多角色我的声音弹窗存在横向溢出');
+        await saveScreenshot(cdp, sessionId, '10-split-voice-studio-multi.png');
 
         await evalJs(`document.getElementById('vsCloseBtn').click()`);
         await waitFor(`document.getElementById('voiceStudioOverlay').hidden === true`, 2000, 'close voice studio');
         const shelfVoiceText = await evalJs(`document.getElementById('btn-shelf-voice-studio')?.textContent || ''`);
-        assert.ok(shelfVoiceText.includes('专属声音生效中'), `书架声音按钮应更新为生效状态，实际: ${shelfVoiceText}`);
+        assert.ok(shelfVoiceText.includes('3 个专属声音生效中'), `书架声音按钮应更新为 3 个专属声音生效状态，实际: ${shelfVoiceText}`);
+
+        // 在《小豌豆和烟烟的踏浪奇遇》漫画页验证朋友真声自动生效 + 未录角色一键点徽章开录
+        await evalJs(`document.querySelector('.book-card[data-book-id="yanyan-sea-wave-adventure"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'reader' && window.__PEA_STORY_HOUSE__.getState().currentBookId === 'yanyan-sea-wave-adventure'`, 4000, 'open yanyan book');
+        await evalJs(`document.getElementById('btn-mode-comic').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().mode === 'comic' && Boolean(document.querySelector('.cast-pill-btn[data-char-id="yanyan"]'))`, 4000, 'yanyan comic mode');
+        assert.equal(await evalJs(`document.querySelector('.cast-pill-btn[data-char-id="yanyan"]').classList.contains('is-cloned')`), true, '已录真声的朋友烟烟徽章应显示已录');
+        assert.equal(await evalJs(`document.querySelector('.cast-pill-btn[data-char-id="seagull"]').classList.contains('is-cloned')`), false, '未录真声的胖海鸥不应标为已录');
+        assert.equal(await evalJs(`document.documentElement.scrollWidth <= window.innerWidth`), true, '带可点击角色徽章的漫画页存在横向溢出');
+
+        await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.clearCache()`);
+        ttsLog.length = 0;
+        await evalJs(`document.querySelector('.comic-bubble[data-character="yanyan"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`, 3000, 'yanyan cloned bubble playback');
+        assert.ok(ttsLog.some((t) => t.role === 'fairy' && t.voiceProfileId === 'yanyan' && t.voiceSource === 'cloned'), '点击烟烟气泡应携 voiceProfileId=yanyan 并命中 cloned 真声');
+
+        await evalJs(`window.__PEA_STORY_HOUSE__.audioEngine.clearCache()`);
+        ttsLog.length = 0;
+        await evalJs(`document.querySelector('.comic-bubble[data-character="seagull"]').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.audioEngine.lastPlaybackMode === 'neural-mp3'`, 3000, 'seagull fallback neural playback');
+        assert.ok(ttsLog.some((t) => t.role === 'star_boy' && t.voiceSource === 'neural'), '未录真声的胖海鸥应走 star_boy 默认神经网络声线');
+        await saveScreenshot(cdp, sessionId, '11-split-yanyan-comic-voices.png');
+
+        await evalJs(`document.querySelector('.cast-pill-btn[data-char-id="seagull"]').click()`);
+        await waitFor(`document.getElementById('voiceStudioOverlay').hidden === false && window.__PEA_STORY_HOUSE__.voiceStudio.activeRoleId === 'seagull'`, 3000, 'click seagull cast pill opens studio preselected');
+        await evalJs(`document.getElementById('vsCloseBtn').click()`);
+        await waitFor(`document.getElementById('voiceStudioOverlay').hidden === true`, 2000, 'close seagull voice studio');
+        await evalJs(`document.getElementById('btn-back-shelf').click()`);
+        await waitFor(`window.__PEA_STORY_HOUSE__.getState().view === 'shelf'`, 3000, 'return to shelf after yanyan check');
 
         // 验证重复点击 sendWish() 防抖、同文本 800ms 播放去重
         const prevWishCount = mailboxLog.wishCalls;

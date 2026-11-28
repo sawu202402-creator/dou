@@ -29,7 +29,8 @@
 4. **二年级多音字拼音 1-to-1 精准对齐**：
    - 每一处带 `pinyin` 的文本（`titlePinyin`、`storyParagraphs[*].pinyin`、`captionPinyin`、`bubbles[*].pinyin`），**汉字数量必须与空格分隔的拼音音节数量严格相等**，且只计算汉字（`/[\u4e00-\u9fff]/`），标点、空格、数字、字母和 Emoji 不写拼音。
    - 多音字必须按语境标对读音，例如：`月亮(yuè liang)`、`长耳朵(cháng ěr duo)`、`长大(zhǎng dà)`、`觉得(jué de)`、`睡觉(shuì jiào)`、`好(hǎo/hào)`、`着(zhe/zháo/zhuó)`、`乐(lè/yuè)`、`行(xíng/háng)`、`重(zhòng/chóng)`、`得(de/dé/děi)`、`只(zhī/zhǐ)`、`的(de)`、`了(le)`、`啊(a)`、`吗(ma)`。
-5. **角色绑定真人神经网络声线**：
+5. **角色绑定真人神经网络声线与朋友真声复用**：
+   - 跨书出现的常驻角色与小豌豆的好朋友（如 `pea`、`yanyan`、`rainbow`、`mochi`、`seagull` 等）应尽量保持一致的小写英文 `characterId` 与中文名 `name`，以便孩子在「🎙️ 角色声音」录制的真人克隆声线在过去与未来所有新书里自动生效。
    - 每本书的 `characters` 映射表必须为每个出场的角色指定 `voiceRole`，且必须属于 `edgeTtsMod.js` 中 `ROLE_NEURAL_VOICES` 已注册的声线：
      - `narrator`（温柔讲故事大姐姐）
      - `pea`（小豌豆）
